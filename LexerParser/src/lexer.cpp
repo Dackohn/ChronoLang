@@ -140,6 +140,7 @@ Token Lexer::makeSymbol() {
         if (match('=')) return makeToken(TokenType::NOT_EQUAL, "!=");
         return makeToken(TokenType::INVALID, "!");
         case '{': return makeToken(TokenType::LBRACE, "{");
+        case '.': return makeToken(TokenType::DOT, ".");
         case '}': return makeToken(TokenType::RBRACE, "}");
         case '(': return makeToken(TokenType::LPAREN, "(");
         case ')': return makeToken(TokenType::RPAREN, ")");

@@ -30,9 +30,18 @@ void Parser::expect(TokenType type, const std::string& errorMessage) {
 }
 
 std::string Parser::parseColumn() {
-    expect(TokenType::ID, "column identifier");
-    return previous().value;
+    expect(TokenType::ID, "table or column name");
+    std::string name = previous().value;
+
+    if (match(TokenType::DOT)) {
+        expect(TokenType::ID, "column name after '.'");
+        name += "." + previous().value;
+    }
+
+    return name;
 }
+
+
 
 std::string Parser::parseValue() {
     if (check(TokenType::STRING) || check(TokenType::INT) || check(TokenType::FLOAT)) {
@@ -175,11 +184,12 @@ ASTNodePtr Parser::parsePlotStatement() {
 
 
 ASTNodePtr Parser::parseExportStatement() {
-    Token source = advance();
+    std::string source = parseColumn(); 
     expect(TokenType::TO, "'TO'");
     Token target = advance();
-    return std::make_unique<ExportStmtNode>(source.value, target.value, source.line, source.column);
+    return std::make_unique<ExportStmtNode>(source, target.value, peek().line, peek().column);
 }
+
 
 ASTNodePtr Parser::parseLoopStatement() {
     expect(TokenType::ID, "loop variable");

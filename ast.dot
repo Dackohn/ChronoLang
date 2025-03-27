@@ -1,8 +1,0 @@
-digraph AST {
-  node [fontname="Courier"];
-  node0 [label="Program", shape=box, style=filled, fillcolor=lightyellow];
-  node1 [label="Load\nID: data\nPath: file.csv", shape=box, style=filled, fillcolor=lightyellow];
-  node0 -> node1;
-  node2 [label="Set\nWindow: 30d", shape=box, style=filled, fillcolor=lightyellow];
-  node0 -> node2;
-}

@@ -27,6 +27,4 @@ __declspec(dllexport) const char* chrono_parse(const char* input) {
 
     return result.c_str();
 }
-    
-
 }
