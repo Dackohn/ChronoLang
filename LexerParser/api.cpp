@@ -5,6 +5,9 @@
 #include <vector>
 #include <sstream>
 #include <iostream>
+#include "include/astToJson.h"
+using nlohmann::json;
+
 
 extern "C" {
 
@@ -16,13 +19,14 @@ __declspec(dllexport) const char* chrono_parse(const char* input) {
 
     try {
         auto ast = parser.parse();
-        drawParseTree(ast, "ast.dot");
-        result = "Parsing successful!";
+        json j = astToJson(ast.get());
+        result = j.dump();  // serialize JSON to string
     } catch (const std::exception& e) {
-        result = std::string("Parsing error: ") + e.what();
+        result = std::string("{\"error\": \"") + e.what() + "\"}";
     }
 
     return result.c_str();
 }
+    
 
 }

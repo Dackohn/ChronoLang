@@ -1,24 +1,34 @@
-import ctypes
-
+from ctypes import cdll, c_char_p
+import json
 import os
-import ctypes
-import platform
-print(platform.architecture())  # Must match your DLL build
-
-
-# Construct the absolute path from this script to the DLL
 dll_path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'chronolang.dll'))
+chrono = cdll.LoadLibrary(dll_path)
+chrono.chrono_parse.argtypes = [c_char_p]
+chrono.chrono_parse.restype = c_char_p
 
-print("[INFO] Loading DLL from:", dll_path)
-print("DLL exists:", os.path.exists(dll_path))
-print("DLL path:", dll_path)
-chrono = ctypes.CDLL(dll_path)
+src = '''LOAD sales_data FROM "data/sales.csv"
+        STREAM live_data FROM "http://api.example.com/stream"
 
-chrono.chrono_parse.argtypes = [ctypes.c_char_p]
-chrono.chrono_parse.restype = ctypes.c_char_p
+        SET WINDOW = 30d
 
-# Example use
-code = b'LOAD data FROM "file.csv"\nSET WINDOW = 30d\n'
+        TREND(sales_amount) -> forecast_next(7d)
+        FORECAST sales_amount USING ARIMA(model_order=2, seasonal_order=1)
 
-print("[PARSE]")
-print(chrono.chrono_parse(code).decode())
+        SELECT sales_amount WHERE DATE > "2024-01-01"
+
+        PLOT LINEPLOT(
+            data=[[100, 200, 150], [120, 220, 170]],
+            x_label="Days",
+            y_label="Sales",
+            title="Weekly Sales",
+            legend=["Week 1", "Week 2"]
+        )
+
+        FOR i IN 1 TO 3 {
+            FORECAST sales_amount USING Prophet(model_order=3, seasonal_order=2)
+            EXPORT "run_${i}" TO "results/run_${i}.csv"
+        }'''
+json_str = chrono.chrono_parse(src.encode('utf-8'))
+ast = json.loads(json_str)
+
+print(json.dumps(ast, indent=2))
