@@ -10,6 +10,12 @@ enum class ASTNodeType {
     Expression, Value,
 };
 
+enum class CleanActionType {
+    Remove,
+    Replace
+};
+
+
 struct ASTNode {
     ASTNodeType type;
     int line;
@@ -52,8 +58,12 @@ struct ForecastStmtNode : public ASTNode {
     std::string column;
     std::string model;
     std::vector<std::pair<std::string, int>> params;
-    ForecastStmtNode(const std::string& column, const std::string& model, int line, int col)
-        : ASTNode(ASTNodeType::Forecast, line, col), column(column), model(model) {}
+    ForecastStmtNode(const std::string& column,
+        const std::string& model,
+        const std::vector<std::pair<std::string, int>>& params,
+        int line, int col)
+        : ASTNode(ASTNodeType::Forecast, line, col), column(column), model(model), params(params) {}
+
 };
 
 struct StreamStmtNode : public ASTNode {
@@ -67,15 +77,19 @@ struct SelectStmtNode : public ASTNode {
     std::string column;
     std::optional<std::string> op;
     std::optional<std::string> dateExpr;
-    SelectStmtNode(const std::string& col, int line, int coln)
-        : ASTNode(ASTNodeType::Select, line, coln), column(col) {}
+    SelectStmtNode(const std::string& col,
+        const std::optional<std::string>& op,
+        const std::optional<std::string>& dateExpr,
+        int line, int coln)
+        : ASTNode(ASTNodeType::Select, line, coln), column(col), op(op), dateExpr(dateExpr) {}
 };
 
 struct PlotStmtNode : public ASTNode {
     std::string function;
     std::vector<std::pair<std::string, std::string>> args;
-    PlotStmtNode(const std::string& fn, int line, int col)
-        : ASTNode(ASTNodeType::Plot, line, col), function(fn) {}
+    PlotStmtNode(const std::string& fn,
+        const std::vector<std::pair<std::string, std::string>>& args,
+        int line, int col): ASTNode(ASTNodeType::Plot, line, col), function(fn), args(args) {}
 };
 
 struct ExportStmtNode : public ASTNode {
@@ -89,17 +103,27 @@ struct LoopStmtNode : public ASTNode {
     std::string var;
     int from, to;
     std::vector<ASTNodePtr> body;
-    LoopStmtNode(const std::string& var, int from, int to, int line, int col)
-        : ASTNode(ASTNodeType::Loop, line, col), var(var), from(from), to(to) {}
+    LoopStmtNode(const std::string& var,
+        int from, int to,
+        std::vector<ASTNodePtr> body,
+        int line, int col): ASTNode(ASTNodeType::Loop, line, col), var(var), from(from), to(to), body(std::move(body)) {}
+
 };
 
 struct CleanStmtNode : public ASTNode {
-    std::string operation;
-    std::string column;
-    std::optional<std::string> value;
-    std::optional<std::string> method;
-    std::optional<std::string> direction;
-    std::optional<std::string> medianMean;
-    CleanStmtNode(const std::string& op, const std::string& col, int line, int coln)
-        : ASTNode(ASTNodeType::Clean, line, coln), operation(op), column(col) {}
+    CleanActionType action;
+    std::string targetValue;  
+    std::string column;       
+    std::string replaceWith;  
+
+    CleanStmtNode(CleanActionType action,
+                  const std::string& targetValue,
+                  const std::string& column,
+                  const std::string& replaceWith,
+                  int line, int col)
+                  : ASTNode(ASTNodeType::Clean, line, col),
+          action(action),
+          targetValue(targetValue),
+          column(column),
+          replaceWith(replaceWith) {}
 };

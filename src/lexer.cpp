@@ -84,7 +84,6 @@ Token Lexer::makeIdentifierOrKeyword() {
     for (char ch : value) upper += std::toupper(ch);
 
     if (keywords.count(upper)) return makeToken(keywords[upper], value);
-    if (value == "d" || value == "h" || value == "m") return makeToken(TokenType::TIME_UNIT, value);
     return makeToken(TokenType::ID, value);
 }
 
@@ -96,13 +95,12 @@ Token Lexer::makeNumber() {
     while (std::isdigit(peek())) advance();
     if (peek() == '.' && std::isdigit(peekNext())) {
         isFloat = true;
-        advance();  // consume '.'
+        advance(); 
         while (std::isdigit(peek())) advance();
     }
 
     std::string value = input.substr(start, pos - start);
 
-    // Handle optional time unit after number
     if (peek() == 'd' || peek() == 'h' || peek() == 'm') {
         value += advance();
         return makeToken(TokenType::TIME_UNIT, value);
@@ -112,7 +110,7 @@ Token Lexer::makeNumber() {
 }
 
 Token Lexer::makeString() {
-    advance();  // skip opening "
+    advance();  
     size_t start = pos;
     int startColumn = column;
 
@@ -122,7 +120,7 @@ Token Lexer::makeString() {
     }
 
     std::string value = input.substr(start, pos - start);
-    advance();  // skip closing "
+    advance();  
     return makeToken(TokenType::STRING, value);
 }
 
