@@ -1,5 +1,6 @@
 #include "include/lexer.h"
 #include "include/parser.h"
+#include "include/ast_visualize.h"
 #include <string>
 #include <vector>
 #include <sstream>
@@ -15,6 +16,7 @@ __declspec(dllexport) const char* chrono_parse(const char* input) {
 
     try {
         auto ast = parser.parse();
+        drawParseTree(ast, "ast.dot");
         result = "Parsing successful!";
     } catch (const std::exception& e) {
         result = std::string("Parsing error: ") + e.what();

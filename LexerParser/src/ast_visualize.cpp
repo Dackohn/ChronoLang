@@ -1,5 +1,5 @@
 //#pragma once
-#include "../include/ast.h"
+#include "../include/ast_visualize.h"
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -120,7 +120,7 @@ inline int drawASTNode(const ASTNode* node, std::ostream& out, int& nextId) {
     return thisId;
 }
 
-inline void drawParseTree(const std::unique_ptr<ProgramNode>& root, const std::string& outputDotFile) {
+void drawParseTree(const std::unique_ptr<ProgramNode>& root, const std::string& outputDotFile) {
     std::ofstream out(outputDotFile);
     out << "digraph AST {\n";
     out << "  node [fontname=\"Courier\"];\n";
