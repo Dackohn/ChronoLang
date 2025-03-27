@@ -1,0 +1,24 @@
+digraph AST {
+  node [fontname="Courier"];
+  node0 [label="Program", shape=box, style=filled, fillcolor=lightyellow];
+  node1 [label="Load\nID: sales_data\nPath: data/sales.csv", shape=box, style=filled, fillcolor=lightyellow];
+  node0 -> node1;
+  node2 [label="Stream\nID: live_data\nPath: http://api.example.com/stream", shape=box, style=filled, fillcolor=lightyellow];
+  node0 -> node2;
+  node3 [label="Set\nWindow: 30d", shape=box, style=filled, fillcolor=lightyellow];
+  node0 -> node3;
+  node4 [label="Transform\nColumn: sales_amount\nNext: 7d", shape=box, style=filled, fillcolor=lightyellow];
+  node0 -> node4;
+  node5 [label="Forecast\nColumn: sales_amount\nModel: ARIMA", shape=box, style=filled, fillcolor=lightyellow];
+  node0 -> node5;
+  node6 [label="Select\nColumn: sales_amount\nWhere DATE > 2024-01-01", shape=box, style=filled, fillcolor=lightyellow];
+  node0 -> node6;
+  node7 [label="Plot\nFunction: LINEPLOT\ndata = [[100,200,150],[120,220,170]]\nx_label = Days\ny_label = Sales\ntitle = Weekly Sales\nlegend = [Week 1,Week 2]", shape=box, style=filled, fillcolor=lightyellow];
+  node0 -> node7;
+  node8 [label="Loop\ni in 1 to 3", shape=box, style=filled, fillcolor=lightyellow];
+  node9 [label="Forecast\nColumn: sales_amount\nModel: Prophet", shape=box, style=filled, fillcolor=lightyellow];
+  node8 -> node9;
+  node10 [label="Export\nFrom: run_${i}\nTo: results/run_${i}.csv", shape=box, style=filled, fillcolor=lightyellow];
+  node8 -> node10;
+  node0 -> node8;
+}

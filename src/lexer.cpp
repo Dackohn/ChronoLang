@@ -3,7 +3,6 @@
 #include <unordered_map>
 #include <cctype>
 
-
 // === Lexer Core ===
 Lexer::Lexer(const std::string& input) : input(input) {}
 
@@ -11,7 +10,10 @@ std::vector<Token> Lexer::tokenize() {
     std::vector<Token> tokens;
     while (true) {
         Token token = nextToken();
-        if (token.type == TokenType::INVALID) continue;
+        if (token.type == TokenType::INVALID) {
+            invalid_tokens.push_back(token);
+            continue;
+        }
         tokens.push_back(token);
         if (token.type == TokenType::END_OF_FILE) break;
     }
@@ -50,11 +52,12 @@ bool Lexer::match(char expected) {
 }
 
 Token Lexer::makeToken(TokenType type, const std::string& value) {
-    return Token(type, value, line, column);
+    return Token(type, value, line, column - value.length());
 }
 
 Token Lexer::makeIdentifierOrKeyword() {
     size_t start = pos;
+    int startColumn = column;
     while (std::isalnum(peek()) || peek() == '_') advance();
     std::string value = input.substr(start, pos - start);
 
@@ -72,55 +75,88 @@ Token Lexer::makeIdentifierOrKeyword() {
         {"BELOW", TokenType::BELOW}, {"ABOVE", TokenType::ABOVE},
         {"MEAN", TokenType::MEAN}, {"MEDIAN", TokenType::MEDIAN},
         {"TENDENCY", TokenType::TENDENCY}, {"ARIMA", TokenType::ARIMA},
-        {"Prophet", TokenType::PROPHET}, {"LSTM", TokenType::LSTM}
+        {"PROPHET", TokenType::PROPHET}, {"LSTM", TokenType::LSTM},
+        {"LINEPLOT", TokenType::LINEPLOT}, {"HISTOGRAM", TokenType::HISTOGRAM},
+        {"SCATTERPLOT", TokenType::SCATTERPLOT}, {"BARPLOT", TokenType::BARPLOT}
     };
 
-    if (keywords.count(value)) return makeToken(keywords[value], value);
-    if (value == "d" || value == "h" || value == "m") return makeToken(TokenType::TIME_UNIT, value);
+    std::string upper;
+    for (char ch : value) upper += std::toupper(ch);
+
+    if (keywords.count(upper)) return makeToken(keywords[upper], value);
     return makeToken(TokenType::ID, value);
 }
 
 Token Lexer::makeNumber() {
     size_t start = pos;
+    int startColumn = column;
     bool isFloat = false;
+
     while (std::isdigit(peek())) advance();
     if (peek() == '.' && std::isdigit(peekNext())) {
         isFloat = true;
-        advance();
+        advance(); 
         while (std::isdigit(peek())) advance();
     }
+
     std::string value = input.substr(start, pos - start);
+
+    if (peek() == 'd' || peek() == 'h' || peek() == 'm') {
+        value += advance();
+        return makeToken(TokenType::TIME_UNIT, value);
+    }
+
     return makeToken(isFloat ? TokenType::FLOAT : TokenType::INT, value);
 }
 
 Token Lexer::makeString() {
-    advance(); // skip opening "
+    advance();  
     size_t start = pos;
+    int startColumn = column;
+
     while (peek() != '"' && pos < input.size()) {
         if (peek() == '\n') line++;
         advance();
     }
+
     std::string value = input.substr(start, pos - start);
-    advance(); // skip closing "
+    advance();  
     return makeToken(TokenType::STRING, value);
 }
 
 Token Lexer::makeSymbol() {
     char c = advance();
     switch (c) {
-        case '=': return makeToken(TokenType::EQUAL, "=");
-        case '<': return makeToken(TokenType::LESS, "<");
-        case '>': return makeToken(TokenType::GREATER, ">");
+        case '=': 
+        if (match('=')) return makeToken(TokenType::EQUAL_EQUAL, "==");
+        return makeToken(TokenType::EQUAL, "=");
+        case '<': 
+        if (match('=')) return makeToken(TokenType::LESS_EQUAL, "<=");
+        return makeToken(TokenType::LESS, "<");
+        case '>': 
+        if (match('=')) return makeToken(TokenType::GREATER_EQUAL, ">=");
+        return makeToken(TokenType::GREATER, ">");
+        case '!':
+        if (match('=')) return makeToken(TokenType::NOT_EQUAL, "!=");
+        return makeToken(TokenType::INVALID, "!");
         case '{': return makeToken(TokenType::LBRACE, "{");
         case '}': return makeToken(TokenType::RBRACE, "}");
         case '(': return makeToken(TokenType::LPAREN, "(");
         case ')': return makeToken(TokenType::RPAREN, ")");
         case ',': return makeToken(TokenType::COMMA, ",");
-        case '-': if (match('>')) return makeToken(TokenType::ARROW, "->"); break;
+        case '[': return makeToken(TokenType::LBRACKET, "[");
+        case ']': return makeToken(TokenType::RBRACKET, "]");        
+        case '-':
+            if (match('>')) return makeToken(TokenType::ARROW, "->");
+            break;
     }
     return makeToken(TokenType::INVALID, std::string(1, c));
 }
-  
+
+const std::vector<Token>& Lexer::getInvalidTokens() const {
+    return invalid_tokens;
+}
+
 static std::string tokenTypeToString(TokenType type) {
     switch (type) {
         case TokenType::LOAD: return "LOAD";
@@ -153,15 +189,25 @@ static std::string tokenTypeToString(TokenType type) {
         case TokenType::ARIMA: return "ARIMA";
         case TokenType::PROPHET: return "PROPHET";
         case TokenType::LSTM: return "LSTM";
+        case TokenType::LINEPLOT: return "LINEPLOT";
+        case TokenType::HISTOGRAM: return "HISTOGRAM";
+        case TokenType::SCATTERPLOT: return "SCATTERPLOT";
+        case TokenType::BARPLOT: return "BARPLOT";
         case TokenType::EQUAL: return "=";
         case TokenType::ARROW: return "->";
         case TokenType::LBRACE: return "{";
         case TokenType::RBRACE: return "}";
         case TokenType::LPAREN: return "(";
         case TokenType::RPAREN: return ")";
+        case TokenType::LBRACKET: return "[";
+        case TokenType::RBRACKET: return "]";        
         case TokenType::COMMA: return ",";
         case TokenType::LESS: return "<";
         case TokenType::GREATER: return ">";
+        case TokenType::EQUAL_EQUAL: return "==";
+        case TokenType::LESS_EQUAL: return "<=";
+        case TokenType::GREATER_EQUAL: return ">=";
+        case TokenType::NOT_EQUAL: return "!=";
         case TokenType::ID: return "ID";
         case TokenType::STRING: return "STRING";
         case TokenType::INT: return "INT";
@@ -184,5 +230,14 @@ void Lexer::runREPL() {
     for (const auto& token : tokens) {
         std::cout << tokenTypeToString(token.type) << "('" << token.value << "')"
                   << " at line " << token.line << ", col " << token.column << "\n";
+    }
+
+    const auto& errors = lexer.getInvalidTokens();
+    if (!errors.empty()) {
+        std::cout << "\nInvalid Tokens Detected:\n";
+        for (const auto& token : errors) {
+            std::cout << "INVALID('" << token.value << "') at line "
+                      << token.line << ", col " << token.column << "\n";
+        }
     }
 }
