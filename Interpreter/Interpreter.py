@@ -8,6 +8,13 @@ from prophet import Prophet
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, Dense
+from ctypes import cdll, c_char_p
+import json
+import os
+dll_path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'chronolang.dll'))
+chrono = cdll.LoadLibrary(dll_path)
+chrono.chrono_parse.argtypes = [c_char_p]
+chrono.chrono_parse.restype = c_char_p
 
 datasets = {}
 
@@ -16,28 +23,78 @@ def load_statement(identifier: str, data_source: str):
     """Loads data from a CSV file into a dictionary."""
 
     datasets[identifier] = pd.read_csv(data_source)
-    return {"message": f"Loaded {identifier} from {data_source}", "data": datasets[identifier].to_dict()}
+    return {"message": f"Loaded {identifier} from {data_source}"}
 
-def export_statement(result, destination: str):
-    """Exports a dataset or a forecast result to a CSV file."""
+def export_statement(identifier: str, column: str, destination: str):
+    """Exports a dataset column or a forecast result to a CSV file."""
+    
+    if identifier not in datasets:
+        return {"error": f"Dataset '{identifier}' not found."}
+    
+    data = datasets[identifier]
+    
+    if column not in data:
+        return {"error": f"Column '{column}' not found in dataset '{identifier}'."}
 
-    if isinstance(result, pd.DataFrame):
-        result.to_csv(destination, index=False)
-        return f"Exported dataset to {destination}"
-
-    elif isinstance(result, dict):
-        if "forecast" in result:
-            df = pd.DataFrame(result["forecast"])
-            df.to_csv(destination, index=False)
-            return f"Exported forecast results to {destination}"
-        else:
-            return {"error": "No valid data to export."}
-
-    return {"error": "Unsupported data type for export."}
+    df = pd.DataFrame({column: data[column]})
+    df.to_csv(destination, index=False)
+    
+    return f"Exported column '{column}' from dataset '{identifier}' to {destination}"
 
 
-def set_statement():
-    """"""
+def set_statement(var_name: str, value):
+
+    """Stores a variable in the interpreter's memory."""
+
+    datasets[var_name] = value
+    return {"message": f"Variable {var_name} set successfully."}
+
+
+def select_statement(identifier: str, column: str, op: str = None, date_expr: str = None):
+
+    """Selects data from a dataset based on conditions."""
+
+    if identifier not in datasets:
+        return {"error": f"Dataset {identifier} not found."}
+    
+    df = datasets[identifier]
+    if column not in df.columns:
+        return {"error": f"Column {column} not found in dataset {identifier}."}
+    
+    if op and date_expr:
+        try:
+            if op == "==":
+                selected_data = df[df[column] == date_expr]
+            elif op == "<":
+                selected_data = df[df[column] < date_expr]
+            elif op == ">":
+                selected_data = df[df[column] > date_expr]
+            elif op == ">=":
+                selected_data = df[df[column] >= date_expr]
+            elif op == "<=":
+                selected_data = df[df[column] <= date_expr]
+            elif op == "!=":
+                selected_data = df[df[column] != date_expr]
+            else:
+                return {"error": f"Unsupported operator: {op}"}
+            
+            return {"message": "Selection completed.", "data": selected_data.to_dict()}
+        except Exception as e:
+            return {"error": f"Selection error: {e}"}
+    else:
+        return {"message": "No condition applied.", "data": df[column].to_dict()}
+
+
+def loop_statement(start: int, end: int, body: list):
+
+    """Executes a loop from 'start' to 'end', executing the given statements in each iteration."""
+
+    for i in range(start, end + 1):
+        for statement in body:
+            interpret({'statements': [statement]})
+    return {"message": f"Executed loop from {start} to {end}"}
+
+
 
 def set_value(var_name: str, var_type: str, value):
 
@@ -84,18 +141,18 @@ def clean_column(dataset_name: str, column_name: str, action: str, replacement=N
     return {"message": f"Column {column_name} cleaned successfully in dataset {dataset_name}."}
 
 
-def transform_statement(column: str, time_interval: str):
+def transform_statement(identifier:str, column: str, time_interval: str):
 
     """Applies a simple linear trend to forecast the next value."""
 
-    if column in datasets:
-        df = datasets[column]
+    if identifier in datasets:
+        df = datasets[identifier]
         x = np.arange(len(df))
         y = df[column]
         coef = np.polyfit(x, y, 1)
         forecast_value = coef[0] * (len(df) + int(time_interval)) + coef[1]
         return {"message": f"Forecasted next {time_interval} value for {column}", "forecast": forecast_value}
-    return {"error": f"Column {column} not found."}
+    return {"error": f"Data form {identifier} or column {column} not found in the {identifier}."}
 
 
 
@@ -246,11 +303,87 @@ def plot_bar(categories, values, x_label: str, y_label: str, orientation: str, t
     return {"message": "Bar plot generated.", "plot": encoded_image}
 
 
-load_statement(1,"Amazon.csv")
-print(datasets[1]["Open"])
+
+def interpret(ast: dict):
+    
+    for statement in ast.get('statements', []):
+        stmt_type = statement.get('type')
+
+        if stmt_type == 'Load':
+            result = load_statement(statement['id'], statement['path'])
+        
+        elif stmt_type == 'Set':
+            result = set_value(statement['amount'], "int", statement['unit'])  
+        
+        elif stmt_type == 'Transform':
+            result = transform_statement(statement['table'], statement['column'], statement['interval']['amount'])
+        elif stmt_type == 'Forecast':
+            for key in statement['params'].keys():
+                value = statement['params'][key]
+                params = {key:value}
+            result = forecast_statement(statement['table'], statement['column'], statement['model'], params)
+        
+        elif stmt_type == 'Stream':
+            result = stream_statement(statement['id'], statement['path'])
+        
+        elif stmt_type == 'Select':
+            select_statement(statement['table'],statement['column'],statement['condition']['op'],statement['condition']['date'])
+            result = {"message": f"Selection operation on {statement['column']} with condition {statement.get('op', 'None')} {statement.get('dateExpr', 'None')}"}
+        
+        elif stmt_type == 'Plot':
+            #args = {key: value for key, value in statement['args']}
+            print(statement['args'].keys())
+            args = {}
+            for key in statement['args'].keys():
+                value =statement['args'][key]
+                args[key]=value
+            if statement['function'] == 'LINEPLOT':
+                result = plot_line(args['data'], args['x_label'], args['y_label'], args.get('title'), args.get('legend'))
+            elif statement['function'] == 'histogram':
+                result = plot_histogram(args['data'], args['x_label'], args['y_label'], int(args['bins']), args.get('title'))
+            elif statement['function'] == 'scatter':
+                result = plot_scatter(args['x_data'], args['y_data'], args['x_label'], args['y_label'], args.get('title'))
+            elif statement['function'] == 'bar':
+                result = plot_bar(args['categories'], args['values'], args['x_label'], args['y_label'], args['orientation'], args.get('title'))
+            else:
+                result = {"error": f"Unknown plot type: {statement['function']}"}
+        
+        elif stmt_type == 'Export':
+            result = export_statement(statement['table'],statement['column'], statement['to'])
+        
+        elif stmt_type == 'Loop':
+            dictionary = {}
+            for _ in range(int(statement['from']),int(statement['to']+1)):
+                dictionary['statements'] = statement['body']
+                print(dictionary)
+                interpret(dictionary)
+            
+        
+        elif stmt_type == 'Clean':
+            if statement['action'] == "Remove":
+                result = clean_column(statement['targetValue'], statement['column'], "delete")
+            elif statement['action'] == "Replace":
+                result = clean_column(statement['targetValue'], statement['column'], "replace", statement['replaceWith'])
+            else:
+                result = {"error": "Unknown clean action"}
+        
+        else:
+            result = {"error": f"Unknown statement type: {stmt_type}"}
+
+        print(result)
+
+f = open("Interpreter\\test.txt", "r")
+src = f.read()
+json_str = chrono.chrono_parse(src.encode('utf-8'))
+ast = json.loads(json_str)
+print(ast)
+interpret(ast)
+
+#load_statement(1,"Amazon.csv")
+#print(datasets[1]["Open"])
 #print(forecast_statement(1, "Open", "LSTM", {"steps": 10, "look_back": 6000}))
 #x = forecast_statement(1, "Open", "ARIMA", {"steps": 10, "look_back": 6000})
 
-x=forecast_statement(1, "Open", "Prophet", {"steps": 10, "look_back": 6000})
-print(x)
-export_statement(x,"results")
+#x=forecast_statement(1, "Open", "Prophet", {"steps": 10, "look_back": 6000})
+#print(x)
+#export_statement(x,"results")
