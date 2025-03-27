@@ -21,35 +21,47 @@ json astToJson(const ASTNode* node) {
             auto* n = dynamic_cast<const TransformStmtNode*>(node);
             return {
                 {"type", "Transform"},
+                {"table", n->table},
                 {"column", n->column},
-                {"interval", {{"amount", n->intervalAmount}, {"unit", n->intervalUnit}}}
+                {"interval", {
+                    {"amount", n->intervalAmount},
+                    {"unit", n->intervalUnit}
+                }}
             };
-        }
+        }        
         case ASTNodeType::Forecast: {
             auto* n = dynamic_cast<const ForecastStmtNode*>(node);
-            json paramsJson = json::object();
-            for (auto& p : n->params)
+            json paramsJson;
+            for (const auto& p : n->params)
                 paramsJson[p.first] = p.second;
+        
             return {
                 {"type", "Forecast"},
+                {"table", n->table},
                 {"column", n->column},
                 {"model", n->model},
                 {"params", paramsJson}
             };
         }
+        
         case ASTNodeType::Stream: {
             auto* n = dynamic_cast<const StreamStmtNode*>(node);
             return { {"type", "Stream"}, {"id", n->id}, {"path", n->path} };
         }
         case ASTNodeType::Select: {
             auto* n = dynamic_cast<const SelectStmtNode*>(node);
-            return {
+            json j = {
                 {"type", "Select"},
-                {"column", n->column},
-                {"condition", (n->op && n->dateExpr) ? json{
-                    {"op", *n->op}, {"date", *n->dateExpr}
-                } : nullptr}
+                {"table", n->table},
+                {"column", n->column}
             };
+            if (n->op && n->dateExpr) {
+                j["condition"] = {
+                    {"op", *n->op},
+                    {"date", *n->dateExpr}
+                };
+            }
+            return j;
         }
         case ASTNodeType::Plot: {
             auto* n = dynamic_cast<const PlotStmtNode*>(node);

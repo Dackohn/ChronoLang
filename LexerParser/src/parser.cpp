@@ -59,6 +59,20 @@ std::unique_ptr<ProgramNode> Parser::parse() {
     return program;
 }
 
+std::pair<std::string, std::optional<std::string>> Parser::parseTableAndColumn() {
+    expect(TokenType::ID, "table name");
+    std::string table = previous().value;
+    std::optional<std::string> column;
+
+    if (match(TokenType::DOT)) {
+        expect(TokenType::ID, "column name after '.'");
+        column = previous().value;
+    }
+
+    return { table, column };
+}
+
+
 // === Main Statement Dispatcher ===
 
 ASTNodePtr Parser::parseStatement() {
@@ -93,24 +107,36 @@ ASTNodePtr Parser::parseSetStatement() {
 
 ASTNodePtr Parser::parseTransformStatement() {
     expect(TokenType::LPAREN, "'('");
-    std::string column = parseColumn();
+    auto [table, column] = parseTableAndColumn();
     expect(TokenType::RPAREN, "')'");
     expect(TokenType::ARROW, "'->'");
     expect(TokenType::ID, "'forecast_next'");
     expect(TokenType::LPAREN, "'('");
     auto [amount, unit] = parseTimeInterval();
     expect(TokenType::RPAREN, "')'");
-    return std::make_unique<TransformStmtNode>(column, amount, unit, peek().line, peek().column);
+
+    if (!column.has_value())
+        throw std::runtime_error("TREND requires a table.column reference");
+
+    return std::make_unique<TransformStmtNode>(
+        table, *column, amount, unit, peek().line, peek().column
+    );
 }
 
 ASTNodePtr Parser::parseForecastStatement() {
-    std::string column = parseColumn();
+    auto [table, column] = parseTableAndColumn();
     expect(TokenType::USING, "'USING'");
     Token model = advance();
     expect(TokenType::LPAREN, "'('");
     auto params = parseParams();
     expect(TokenType::RPAREN, "')'");
-    return std::make_unique<ForecastStmtNode>(column, model.value, params, model.line, model.column);
+
+    if (!column.has_value())
+        throw std::runtime_error("FORECAST requires a table.column reference");
+
+    return std::make_unique<ForecastStmtNode>(
+        table, *column, model.value, params, model.line, model.column
+    );
 }
 
 ASTNodePtr Parser::parseStreamStatement() {
@@ -121,15 +147,22 @@ ASTNodePtr Parser::parseStreamStatement() {
 }
 
 ASTNodePtr Parser::parseSelectStatement() {
-    std::string column = parseColumn();
+    auto [table, column] = parseTableAndColumn();
     std::optional<std::string> op, date;
     if (match(TokenType::WHERE)) {
         expect(TokenType::DATE, "'DATE'");
-        op = advance().value;
-        date = advance().value;
+        Token oper = advance();
+        Token expr = advance();
+        op = oper.value;
+        date = expr.value;
     }
-    return std::make_unique<SelectStmtNode>(column, op, date, peek().line, peek().column);
 
+    if (!column.has_value())
+        throw std::runtime_error("SELECT requires a table.column reference");
+
+    return std::make_unique<SelectStmtNode>(
+        table, *column, op, date, peek().line, peek().column
+    );
 }
 
 ASTNodePtr Parser::parsePlotStatement() {

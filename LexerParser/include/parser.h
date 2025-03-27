@@ -22,6 +22,7 @@ private:
     bool isAtEnd() const;
     void expect(TokenType type, const std::string& errorMessage);
     void synchronize();
+    std::pair<std::string, std::optional<std::string>> parseTableAndColumn();
     ASTNodePtr parseStatement();
 
     ASTNodePtr parseLoadStatement();

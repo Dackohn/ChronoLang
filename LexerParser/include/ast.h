@@ -47,24 +47,34 @@ struct SetStmtNode : public ASTNode {
 };
 
 struct TransformStmtNode : public ASTNode {
+    std::string table;
     std::string column;
     int intervalAmount;
     std::string intervalUnit;
-    TransformStmtNode(const std::string& column, int amt, const std::string& unit, int line, int col)
-        : ASTNode(ASTNodeType::Transform, line, col), column(column), intervalAmount(amt), intervalUnit(unit) {}
+
+    TransformStmtNode(const std::string& table, const std::string& column,
+                      int amt, const std::string& unit,
+                      int line, int col)
+        : ASTNode(ASTNodeType::Transform, line, col),
+          table(table), column(column),
+          intervalAmount(amt), intervalUnit(unit) {}
 };
 
+
 struct ForecastStmtNode : public ASTNode {
+    std::string table;
     std::string column;
     std::string model;
     std::vector<std::pair<std::string, int>> params;
-    ForecastStmtNode(const std::string& column,
-        const std::string& model,
-        const std::vector<std::pair<std::string, int>>& params,
-        int line, int col)
-        : ASTNode(ASTNodeType::Forecast, line, col), column(column), model(model), params(params) {}
 
+    ForecastStmtNode(const std::string& table, const std::string& column,
+                        const std::string& model,
+                        const std::vector<std::pair<std::string, int>>& params,
+                        int line, int col)
+        : ASTNode(ASTNodeType::Forecast, line, col),
+            table(table), column(column), model(model), params(params) {}
 };
+    
 
 struct StreamStmtNode : public ASTNode {
     std::string id;
@@ -74,15 +84,20 @@ struct StreamStmtNode : public ASTNode {
 };
 
 struct SelectStmtNode : public ASTNode {
+    std::string table;
     std::string column;
     std::optional<std::string> op;
     std::optional<std::string> dateExpr;
-    SelectStmtNode(const std::string& col,
-        const std::optional<std::string>& op,
-        const std::optional<std::string>& dateExpr,
-        int line, int coln)
-        : ASTNode(ASTNodeType::Select, line, coln), column(col), op(op), dateExpr(dateExpr) {}
+
+    SelectStmtNode(const std::string& table,
+                   const std::string& column,
+                   std::optional<std::string> op,
+                   std::optional<std::string> dateExpr,
+                   int line, int col)
+        : ASTNode(ASTNodeType::Select, line, col),
+          table(table), column(column), op(op), dateExpr(dateExpr) {}
 };
+
 
 struct PlotStmtNode : public ASTNode {
     std::string function;
