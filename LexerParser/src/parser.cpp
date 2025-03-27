@@ -184,11 +184,21 @@ ASTNodePtr Parser::parsePlotStatement() {
 
 
 ASTNodePtr Parser::parseExportStatement() {
-    std::string source = parseColumn(); 
+    expect(TokenType::ID, "table or column name");
+    std::string table = previous().value;
+    std::optional<std::string> column;
+
+    if (match(TokenType::DOT)) {
+        expect(TokenType::ID, "column name after '.'");
+        column = previous().value;
+    }
+
     expect(TokenType::TO, "'TO'");
     Token target = advance();
-    return std::make_unique<ExportStmtNode>(source, target.value, peek().line, peek().column);
+
+    return std::make_unique<ExportStmtNode>(table, column, target.value, table.length(), target.column);
 }
+
 
 
 ASTNodePtr Parser::parseLoopStatement() {

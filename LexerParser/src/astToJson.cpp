@@ -60,8 +60,17 @@ json astToJson(const ASTNode* node) {
         }
         case ASTNodeType::Export: {
             auto* n = dynamic_cast<const ExportStmtNode*>(node);
-            return { {"type", "Export"}, {"from", n->source}, {"to", n->target} };
+            json j = {
+                {"type", "Export"},
+                {"table", n->table},
+                {"to", n->target}
+            };
+            if (n->column.has_value()) {
+                j["column"] = *n->column;
+            }
+            return j;
         }
+        
         case ASTNodeType::Loop: {
             auto* n = dynamic_cast<const LoopStmtNode*>(node);
             json body = json::array();

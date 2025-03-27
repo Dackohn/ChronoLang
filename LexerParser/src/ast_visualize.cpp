@@ -86,10 +86,25 @@ inline int drawASTNode(const ASTNode* node, std::ostream& out, int& nextId) {
              
         case ASTNodeType::Export: {
             const auto* n = dynamic_cast<const ExportStmtNode*>(node);
-            label << "Export\nFrom: " << n->source << "\nTo: " << n->target;
+            label << "Export";
             drawNode(out, thisId, label.str());
+        
+            int tableNode = nextId++;
+            drawNode(out, tableNode, "table: " + n->table);
+            out << "  node" << thisId << " -> node" << tableNode << ";\n";
+        
+            if (n->column) {
+                int colNode = nextId++;
+                drawNode(out, colNode, "column: " + *n->column);
+                out << "  node" << thisId << " -> node" << colNode << ";\n";
+            }
+        
+            int tgtNode = nextId++;
+            drawNode(out, tgtNode, "to: " + n->target);
+            out << "  node" << thisId << " -> node" << tgtNode << ";\n";
             break;
         }
+        
         case ASTNodeType::Loop: {
             const auto* n = dynamic_cast<const LoopStmtNode*>(node);
             label << "Loop\n" << n->var << " in " << n->from << " to " << n->to;

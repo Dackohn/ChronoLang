@@ -93,11 +93,18 @@ struct PlotStmtNode : public ASTNode {
 };
 
 struct ExportStmtNode : public ASTNode {
-    std::string source;
+    std::string table;
+    std::optional<std::string> column; 
     std::string target;
-    ExportStmtNode(const std::string& source, const std::string& target, int line, int col)
-        : ASTNode(ASTNodeType::Export, line, col), source(source), target(target) {}
+
+    ExportStmtNode(const std::string& table,
+                   std::optional<std::string> column,
+                   const std::string& target,
+                   int line, int col)
+        : ASTNode(ASTNodeType::Export, line, col),
+          table(table), column(std::move(column)), target(target) {}
 };
+
 
 
 struct LoopStmtNode : public ASTNode {
