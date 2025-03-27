@@ -124,20 +124,16 @@ ASTNodePtr Parser::parseSelectStatement() {
 }
 
 ASTNodePtr Parser::parsePlotStatement() {
-    Token plotType = advance(); // e.g., LINEPLOT
+    Token plotType = advance();
     expect(TokenType::LPAREN, "'('");
 
     std::vector<std::pair<std::string, std::string>> args;
 
     while (!check(TokenType::RPAREN)) {
-        // Parse key
         expect(TokenType::ID, "parameter key");
         std::string key = previous().value;
-
-        // Parse '='
         expect(TokenType::EQUAL, "'='");
 
-        // Parse value (literal or list)
         std::string value;
         if (check(TokenType::STRING) || check(TokenType::INT) || check(TokenType::FLOAT)) {
             value = advance().value;
@@ -167,7 +163,6 @@ ASTNodePtr Parser::parsePlotStatement() {
 
         args.emplace_back(key, value);
 
-        // Comma or end
         if (!check(TokenType::RPAREN)) {
             expect(TokenType::COMMA, "',' or ')'");
         }
@@ -232,7 +227,7 @@ ASTNodePtr Parser::parseCleanStatement() {
             first.line,
             first.column
         );
-    } else { // REPLACE
+    } else { 
         expect(TokenType::IN, "'IN'");
         std::string column = parseColumn();
         expect(TokenType::WITH, "'WITH'");
