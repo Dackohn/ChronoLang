@@ -17,7 +17,7 @@ public class ParsingController {
         // Logging
         System.out.println(code);
         try {
-            ProcessBuilder pb = new ProcessBuilder("python3", "CLang/Interpreter/test.py", code);
+            ProcessBuilder pb = new ProcessBuilder("python3", "cl/Interpreter/test.py", code);
             pb.redirectErrorStream(true);
 
             Process process = pb.start();
