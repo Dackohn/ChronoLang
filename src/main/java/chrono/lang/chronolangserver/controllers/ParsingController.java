@@ -14,7 +14,6 @@ public class ParsingController {
     @PostMapping("/parse")
     public ResponseEntity<String> parseChronoCode(@RequestBody Map<String, String> request) {
         String code = request.get("code");
-        // Logging
         System.out.println(code);
         try {
             ProcessBuilder pb = new ProcessBuilder("python3", "cl/Interpreter/test.py", code);
