@@ -12,9 +12,7 @@ LOAD sales_data FROM "Interpreter\Amazon.csv"
             title="Weekly Sales",
             legend=["Week 1", "Week 2"]
         )
-
         FOR i IN 1 TO 3 {
             FORECAST sales_data.Open USING Prophet(model_order=3, seasonal_order=2)
             EXPORT sales_data.Open TO "results/run_${i}.csv"
         }
-        

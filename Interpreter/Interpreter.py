@@ -361,9 +361,9 @@ def interpret(ast: dict):
         
         elif stmt_type == 'Clean':
             if statement['action'] == "Remove":
-                result = clean_column(statement['targetValue'], statement['column'], "delete")
+                result = clean_column(statement['table'], statement['column'], "delete")
             elif statement['action'] == "Replace":
-                result = clean_column(statement['targetValue'], statement['column'], "replace", statement['replaceWith'])
+                result = clean_column(statement['table'], statement['column'], "replace", statement['replaceWith'])
             else:
                 result = {"error": "Unknown clean action"}
         
