@@ -11,6 +11,7 @@ from tensorflow.keras.layers import LSTM, Dense
 from ctypes import cdll, c_char_p
 import json
 import os
+from ast import literal_eval
 dll_path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'chronolang.dll'))
 chrono = cdll.LoadLibrary(dll_path)
 chrono.chrono_parse.argtypes = [c_char_p]
@@ -251,12 +252,19 @@ def plot_line(data, x_label: str, y_label: str, title=None, legend=None):
     plt.figure()
     for series in data:
         plt.plot(series)
+        print(series)
     plt.xlabel(x_label)
+    print(x_label)
     plt.ylabel(y_label)
+    print(y_label)
     if title:
         plt.title(title)
+        print(title)
     if legend:
         plt.legend(legend)
+        print(legend)
+    
+    plt.show()
     encoded_image = generate_plot()
     return {"message": "Line plot generated.", "plot": encoded_image}
 
@@ -302,6 +310,14 @@ def plot_bar(categories, values, x_label: str, y_label: str, orientation: str, t
     encoded_image = generate_plot()
     return {"message": "Bar plot generated.", "plot": encoded_image}
 
+def safe_parse(value):
+    if isinstance(value, str):
+        try:
+            parsed = ast.literal_eval(value)
+            return parsed
+        except Exception:
+            return value  # Return original string if it can't be parsed
+    return value
 
 
 def interpret(ast: dict):
@@ -336,7 +352,7 @@ def interpret(ast: dict):
             args = {}
             for key in statement['args'].keys():
                 value =statement['args'][key]
-                args[key]=value
+                args[key]=safe_parse(value)
             if statement['function'] == 'LINEPLOT':
                 result = plot_line(args['data'], args['x_label'], args['y_label'], args.get('title'), args.get('legend'))
             elif statement['function'] == 'histogram':

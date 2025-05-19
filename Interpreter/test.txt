@@ -1,7 +1,7 @@
 LOAD sales_data FROM "Interpreter\Amazon.csv"
 
         TREND(sales_data.Open) -> forecast_next(7d)
-        FORECAST sales_data.Open USING ARIMA(model_order=2, seasonal_order=1)
+     
 
         SELECT sales_data.ales_amount WHERE DATE > "2024-01-01"
 
@@ -10,7 +10,7 @@ LOAD sales_data FROM "Interpreter\Amazon.csv"
             x_label="Days",
             y_label="Sales",
             title="Weekly Sales",
-            legend=["Week 1", "Week 2"]
+            legend=["1", "2"]
         )
         FOR i IN 1 TO 3 {
             FORECAST sales_data.Open USING Prophet(model_order=3, seasonal_order=2)
