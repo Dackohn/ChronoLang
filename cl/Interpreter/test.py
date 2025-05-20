@@ -12,7 +12,6 @@ def main():
 
     src = sys.argv[1]
 
-    # Определение и загрузка библиотеки (остается без изменений)
     if platform.system() == "Windows":
         lib_extension = ".dll"
     elif platform.system() == "Darwin":
@@ -34,7 +33,6 @@ def main():
         print(f"Make sure you have compiled the library for {platform.system()} as {lib_name}")
         sys.exit(1)
 
-    # Парсинг и вывод результата
     try:
         json_str = chrono.chrono_parse(src.encode('utf-8'))
         ast = json.loads(json_str)

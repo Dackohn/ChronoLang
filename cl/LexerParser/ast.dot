@@ -1,0 +1,16 @@
+digraph AST {
+  node [fontname="Courier"];
+  node0 [label="Program", shape=box, style=filled, fillcolor=lightyellow];
+  node1 [label="Transform\nColumn: sales_data.sales_amount\nNext: 7d", shape=box, style=filled, fillcolor=lightyellow];
+  node0 -> node1;
+  node2 [label="Forecast\nColumn: sales_data.sales_amount\nModel: ARIMA", shape=box, style=filled, fillcolor=lightyellow];
+  node0 -> node2;
+  node3 [label="Export", shape=box, style=filled, fillcolor=lightyellow];
+  node4 [label="table: sales_data", shape=box, style=filled, fillcolor=lightyellow];
+  node3 -> node4;
+  node5 [label="column: sales_amount", shape=box, style=filled, fillcolor=lightyellow];
+  node3 -> node5;
+  node6 [label="to: results/sales_amount.csv", shape=box, style=filled, fillcolor=lightyellow];
+  node3 -> node6;
+  node0 -> node3;
+}
