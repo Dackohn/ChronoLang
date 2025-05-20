@@ -3,10 +3,12 @@ LOAD sales_data FROM "Interpreter\Amazon.csv"
         TREND(sales_data.Open) -> forecast_next(7d)
      
 
-        SELECT sales_data.ales_amount WHERE DATE > "2024-01-01"
+        SELECT sales_data.Volume WHERE DATE == "2019-01-01"
+        REMOVE missing FROM sales_data.Low
+        EXPORT sales_data.Low TO "results/run.csv"
 
         PLOT LINEPLOT(
-            data=[[100, 200, 150], [120, 220, 170]],
+            data=[sales_data.High,sales_data.Low],
             x_label="Days",
             y_label="Sales",
             title="Weekly Sales",

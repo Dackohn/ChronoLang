@@ -53,36 +53,70 @@ def set_statement(var_name: str, value):
 
 def select_statement(identifier: str, column: str, op: str = None, date_expr: str = None):
 
-    """Selects data from a dataset based on conditions."""
 
     if identifier not in datasets:
         return {"error": f"Dataset {identifier} not found."}
     
     df = datasets[identifier]
+    
     if column not in df.columns:
         return {"error": f"Column {column} not found in dataset {identifier}."}
     
     if op and date_expr:
         try:
+            comparison_column = 'Date'
+            
+            if comparison_column not in df.columns:
+                date_columns = [col for col in df.columns if 'date' in col.lower() or 'time' in col.lower()]
+                if date_columns:
+                    comparison_column = date_columns[0]
+                else:
+                    return {"error": f"No date column found in dataset {identifier} for comparison."}
+            
+            col_dtype = df[comparison_column].dtype
+            
+            if 'datetime' in str(col_dtype) or 'date' in str(col_dtype):
+                import pandas as pd
+                date_expr_converted = pd.to_datetime(date_expr)
+            elif 'int' in str(col_dtype) or 'float' in str(col_dtype):
+                import pandas as pd
+                import time
+                date_expr_converted = pd.to_datetime(date_expr).timestamp()
+                if df[comparison_column].max() < 20000101 and df[comparison_column].min() > 19000101:
+                    from datetime import datetime
+                    date_obj = datetime.strptime(date_expr, "%Y-%m-%d")
+                    date_expr_converted = int(date_obj.strftime("%Y%m%d"))
+            else:
+                date_expr_converted = date_expr
+            
+            # Perform the comparison
             if op == "==":
-                selected_data = df[df[column] == date_expr]
+                selected_data = df[df[comparison_column] == date_expr_converted]
             elif op == "<":
-                selected_data = df[df[column] < date_expr]
+                selected_data = df[df[comparison_column] < date_expr_converted]
             elif op == ">":
-                selected_data = df[df[column] > date_expr]
+                selected_data = df[df[comparison_column] > date_expr_converted]
             elif op == ">=":
-                selected_data = df[df[column] >= date_expr]
+                selected_data = df[df[comparison_column] >= date_expr_converted]
             elif op == "<=":
-                selected_data = df[df[column] <= date_expr]
+                selected_data = df[df[comparison_column] <= date_expr_converted]
             elif op == "!=":
-                selected_data = df[df[column] != date_expr]
+                selected_data = df[df[comparison_column] != date_expr_converted]
             else:
                 return {"error": f"Unsupported operator: {op}"}
             
-            return {"message": "Selection completed.", "data": selected_data.to_dict()}
+            # Extract the requested column from the filtered data
+            result_data = selected_data[column].to_dict() if not selected_data.empty else {}
+            
+            return {
+                "message": f"Selected {len(result_data)} rows from {column} where {comparison_column} {op} {date_expr}"
+                #"data": result_data
+            }
+            
         except Exception as e:
-            return {"error": f"Selection error: {e}"}
+            return {"error": f"Selection error: {str(e)}"}
     else:
+        # No condition provided, return the entire column
         return {"message": "No condition applied.", "data": df[column].to_dict()}
 
 
@@ -193,6 +227,7 @@ def forecast_statement(identifier: str, column: str, model: str, params: dict):
         elif model == "LSTM":
             steps = params.get("steps", 1)
             look_back = params.get("look_back", 5)
+            layers = params.get("layers",3)
 
             data = df[column].values.reshape(-1, 1)
             x_train, y_train = [], []
@@ -245,28 +280,93 @@ def generate_plot():
     buf.close()
     return encoded_image
 
+def safe_parse(value):
+    if isinstance(value, str):
+        try:
+            # Import literal_eval at the top level and use it directly here
+            import ast
+            parsed = ast.literal_eval(value)
+            return parsed
+        except Exception:
+            return value  # Return original string if it can't be parsed
+    return value
+
 def plot_line(data, x_label: str, y_label: str, title=None, legend=None):
-
-    """Generates a line plot."""
-
-    plt.figure()
-    for series in data:
-        plt.plot(series)
-        print(series)
+    
+    plt.figure(figsize=(10, 6))
+    
+    # Debug information
+    print(f"Plot_line received data type: {type(data)}")
+    print(f"Data content preview: {str(data)[:200]}...")
+    
+    # Handle the case where data is None or empty
+    if data is None or (isinstance(data, list) and len(data) == 0):
+        return {"error": "No data provided for plotting"}
+    
+    try:
+        # Case 1: Single data series (list/array of values)
+        if (isinstance(data, list) and all(isinstance(x, (int, float, np.number)) for x in data)) or \
+           isinstance(data, np.ndarray) and data.ndim == 1:
+            plt.plot(data, label='Series')
+            use_legend = True
+        
+        # Case 2: List of data series
+        elif isinstance(data, list) and all(isinstance(series, (list, np.ndarray)) for series in data):
+            use_legend = False
+            for i, series in enumerate(data):
+                # Check if we have enough data points to plot
+                if len(series) > 0:
+                    plt.plot(series, label=f'Series {i+1}')
+                    use_legend = True
+        
+        # Case 3: Pandas DataFrame or Series
+        elif hasattr(data, 'plot'):
+            data.plot(ax=plt.gca())
+            use_legend = True
+        
+        # Case 4: Try to convert other types to a numpy array
+        else:
+            try:
+                data_array = np.array(data)
+                if data_array.ndim == 1:
+                    plt.plot(data_array, label='Series')
+                    use_legend = True
+                elif data_array.ndim == 2:
+                    for i in range(data_array.shape[1] if data_array.shape[0] < data_array.shape[1] else data_array.shape[0]):
+                        plt.plot(data_array[i] if data_array.shape[0] > data_array.shape[1] else data_array[:, i], 
+                                label=f'Series {i+1}')
+                    use_legend = True
+                else:
+                    return {"error": "Data has too many dimensions for plotting"}
+            except Exception as e:
+                return {"error": f"Failed to convert data for plotting: {str(e)}"}
+    
+    except Exception as e:
+        return {"error": f"Error during plot generation: {str(e)}"}
+    
     plt.xlabel(x_label)
-    print(x_label)
     plt.ylabel(y_label)
-    print(y_label)
     if title:
         plt.title(title)
-        print(title)
-    if legend:
-        plt.legend(legend)
-        print(legend)
     
+    if legend:
+        # Try to parse legend if it's a string
+        if isinstance(legend, str):
+            try:
+                import ast
+                parsed_legend = ast.literal_eval(legend)
+                legend = parsed_legend if isinstance(parsed_legend, list) else [legend]
+            except Exception:
+                legend = [legend]  # Keep as a single string if parsing fails
+        
+        plt.legend(legend)
+    elif use_legend:
+        plt.legend()
+    plt.grid(True, linestyle='--', alpha=0.7)
+    plt.tight_layout()
     plt.show()
     encoded_image = generate_plot()
-    return {"message": "Line plot generated.", "plot": encoded_image}
+    return {"message": "Line plot generated successfully.", "plot": encoded_image}
 
 def plot_histogram(data, x_label: str, y_label: str, bins: int, title=None):
 
@@ -319,7 +419,6 @@ def safe_parse(value):
             return value  # Return original string if it can't be parsed
     return value
 
-
 def interpret(ast: dict):
     
     for statement in ast.get('statements', []):
@@ -334,55 +433,208 @@ def interpret(ast: dict):
         elif stmt_type == 'Transform':
             result = transform_statement(statement['table'], statement['column'], statement['interval']['amount'])
         elif stmt_type == 'Forecast':
-            for key in statement['params'].keys():
-                value = statement['params'][key]
-                params = {key:value}
+            params = {}
+            for key, value in statement['params'].items():
+                params[key] = value
             result = forecast_statement(statement['table'], statement['column'], statement['model'], params)
         
         elif stmt_type == 'Stream':
             result = stream_statement(statement['id'], statement['path'])
         
         elif stmt_type == 'Select':
-            select_statement(statement['table'],statement['column'],statement['condition']['op'],statement['condition']['date'])
-            result = {"message": f"Selection operation on {statement['column']} with condition {statement.get('op', 'None')} {statement.get('dateExpr', 'None')}"}
+            # The column in the SELECT statement refers to what we want to retrieve
+            column_to_retrieve = statement['column']
+            
+            # The condition typically includes a DATE column and a comparison
+            if 'condition' in statement and 'op' in statement['condition'] and 'date' in statement['condition']:
+                op = statement['condition']['op']
+                date_value = statement['condition']['date']
+                
+                # Pass these to the select_statement function
+                result = select_statement(statement['table'], column_to_retrieve, op, date_value)
+            else:
+                # No condition - retrieve all values for the column
+                result = select_statement(statement['table'], column_to_retrieve)
+                
+            # Store the result in datasets to make it available for other operations
+            if 'data' in result:
+                # Create a DataFrame from the selected data
+                import pandas as pd
+                selected_data = pd.DataFrame({column_to_retrieve: result['data'].values()})
+                datasets[f"{statement['table']}_selected"] = selected_data
         
         elif stmt_type == 'Plot':
-            #args = {key: value for key, value in statement['args']}
-            print(statement['args'].keys())
             args = {}
-            for key in statement['args'].keys():
-                value =statement['args'][key]
-                args[key]=safe_parse(value)
+            for key, value in statement['args'].items():
+                print(f"Processing argument {key} with value: {value}")
+                
+                # CASE 1: Handle comma-separated list of dataset references without brackets
+                if isinstance(value, str) and ',' in value and '.' in value:
+                    parts = [part.strip() for part in value.split(',')]
+                    all_parts_are_refs = all('.' in part and part.count('.') == 1 for part in parts)
+                    
+                    if all_parts_are_refs:
+                        try:
+                            processed_list = []
+                            for part in parts:
+                                dataset_name, column_name = part.split('.')
+                                if dataset_name in datasets and column_name in datasets[dataset_name].columns:
+                                    processed_list.append(datasets[dataset_name][column_name].tolist())
+                                else:
+                                    raise ValueError(f"Invalid dataset reference: {part}")
+                            
+                            args[key] = processed_list
+                            print(f"Processed comma-separated references for {key}: {len(processed_list)} series")
+                            continue
+                        except Exception as e:
+                            print(f"Error processing comma-separated references: {str(e)}")
+                
+                # CASE 2: Handle the specific pattern: data=[sales_data.Open]
+                if isinstance(value, str) and value.startswith('[') and value.endswith(']'):
+                    inner_content = value[1:-1].strip()
+                    
+                    # CASE 2.1: Handle comma-separated dataset references inside brackets
+                    # Example: [sales_data.High,sales_data.Low]
+                    if ',' in inner_content and all('.' in part.strip() for part in inner_content.split(',')):
+                        try:
+                            parts = [part.strip() for part in inner_content.split(',')]
+                            processed_list = []
+                            
+                            for part in parts:
+                                dataset_name, column_name = part.split('.')
+                                if dataset_name in datasets and column_name in datasets[dataset_name].columns:
+                                    processed_list.append(datasets[dataset_name][column_name].tolist())
+                                else:
+                                    # If any reference is invalid, abort this processing method
+                                    raise ValueError(f"Invalid dataset reference: {part}")
+                            
+                            args[key] = processed_list
+                            print(f"Processed bracketed comma-separated references for {key}: {len(processed_list)} series")
+                            continue
+                        except Exception as e:
+                            print(f"Error processing bracketed comma-separated references: {str(e)}")
+                    
+                    # CASE 2.2: Handle single dataset reference in brackets
+                    # Example: [sales_data.Open]
+                    if '.' in inner_content and inner_content.count('.') == 1:
+                        try:
+                            dataset_name, column_name = inner_content.split('.')
+                            if dataset_name in datasets and column_name in datasets[dataset_name].columns:
+                                # Use the actual data from the dataset column as a single element in a list
+                                args[key] = [datasets[dataset_name][column_name].tolist()]
+                                print(f"Processed single bracketed reference for {key}")
+                                continue
+                        except Exception as e:
+                            print(f"Error processing single bracketed reference: {str(e)}")
+                
+                # CASE 3: Handle direct dataset column references (e.g., "sales_data.Open")
+                if isinstance(value, str) and '.' in value and value.count('.') == 1:
+                    try:
+                        dataset_name, column_name = value.split('.')
+                        if dataset_name in datasets and column_name in datasets[dataset_name].columns:
+                            # Use the actual data from the dataset column
+                            args[key] = datasets[dataset_name][column_name].tolist()
+                            print(f"Processed single column reference for {key}")
+                            continue
+                    except Exception as e:
+                        print(f"Error processing single column reference: {str(e)}")
+                
+                # CASE 4: Try to parse as Python literal (for complex list structures)
+                if isinstance(value, str):
+                    try:
+                        import ast as python_ast
+                        parsed_value = python_ast.literal_eval(value)
+                        
+                        if isinstance(parsed_value, list):
+                            processed_list = []
+                            all_elements_processed = True
+                            
+                            for item in parsed_value:
+                                if isinstance(item, str) and '.' in item and item.count('.') == 1:
+                                    # Looks like a dataset reference
+                                    dataset_name, column_name = item.split('.')
+                                    if dataset_name in datasets and column_name in datasets[dataset_name].columns:
+                                        processed_list.append(datasets[dataset_name][column_name].tolist())
+                                    else:
+                                        processed_list.append(item)
+                                        all_elements_processed = False
+                                else:
+                                    processed_list.append(item)
+                                    all_elements_processed = False
+                            
+                            if all_elements_processed or len(processed_list) != len(parsed_value):
+                                args[key] = processed_list
+                                print(f"Processed complex list reference for {key}")
+                                continue
+                            else:
+                                args[key] = parsed_value
+                                continue
+                        else:
+                            # Not a list, use the parsed value as is
+                            args[key] = parsed_value
+                            continue
+                    except Exception as e:
+                        print(f"Error parsing as Python literal: {str(e)}")
+                args[key] = value
+            
             if statement['function'] == 'LINEPLOT':
-                result = plot_line(args['data'], args['x_label'], args['y_label'], args.get('title'), args.get('legend'))
+                '''result = '''
+                plot_line(args.get('data', []), 
+                                args.get('x_label', ''), 
+                                args.get('y_label', ''), 
+                                args.get('title'), 
+                                args.get('legend'))
             elif statement['function'] == 'histogram':
-                result = plot_histogram(args['data'], args['x_label'], args['y_label'], int(args['bins']), args.get('title'))
+                '''result = '''
+                plot_histogram(args.get('data', []), 
+                                    args.get('x_label', ''), 
+                                    args.get('y_label', ''), 
+                                    int(args.get('bins', 10)), 
+                                    args.get('title'))
             elif statement['function'] == 'scatter':
-                result = plot_scatter(args['x_data'], args['y_data'], args['x_label'], args['y_label'], args.get('title'))
+                '''result =''' 
+                plot_scatter(args.get('x_data', []), 
+                                args.get('y_data', []), 
+                                args.get('x_label', ''), 
+                                args.get('y_label', ''), 
+                                args.get('title'))
             elif statement['function'] == 'bar':
-                result = plot_bar(args['categories'], args['values'], args['x_label'], args['y_label'], args['orientation'], args.get('title'))
+                '''result =''' 
+                plot_bar(args.get('categories', []), 
+                            args.get('values', []), 
+                            args.get('x_label', ''), 
+                            args.get('y_label', ''), 
+                            args.get('orientation', 'vertical'), 
+                            args.get('title'))
             else:
                 result = {"error": f"Unknown plot type: {statement['function']}"}
-        
         elif stmt_type == 'Export':
-            result = export_statement(statement['table'],statement['column'], statement['to'])
+            result = export_statement(statement['table'], statement['column'], statement['to'])
         
         elif stmt_type == 'Loop':
             dictionary = {}
-            for _ in range(int(statement['from']),int(statement['to']+1)):
+            for _ in range(int(statement['from']), int(statement['to']) + 1):
                 dictionary['statements'] = statement['body']
-                print(dictionary)
                 interpret(dictionary)
-            
         
         elif stmt_type == 'Clean':
-            if statement['action'] == "Remove":
-                result = clean_column(statement['table'], statement['column'], "delete")
-            elif statement['action'] == "Replace":
-                result = clean_column(statement['table'], statement['column'], "replace", statement['replaceWith'])
+            if 'column' in statement:
+                if '.' in statement['column']:
+                    table_name, column_name = statement['column'].split('.')
+                else:
+                    table_name = statement.get('table', '')
+                    column_name = statement['column']
+                
+                action = statement.get('action', '').lower()
+                
+                if action == 'remove':
+                    result = clean_column(table_name, column_name, "delete")
+                elif action == 'replace':
+                    result = clean_column(table_name, column_name, "replace", statement.get('replaceWith'))
+                else:
+                    result = {"error": f"Unknown clean action: {action}"}
             else:
-                result = {"error": "Unknown clean action"}
-        
+                result = {"error": "Missing column in Clean statement"}
         else:
             result = {"error": f"Unknown statement type: {stmt_type}"}
 
