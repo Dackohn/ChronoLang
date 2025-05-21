@@ -3,7 +3,7 @@ LOAD sales_data FROM "Interpreter\Amazon.csv"
         TREND(sales_data.Open) -> forecast_next(7d)
      
 
-        SELECT sales_data.Volume WHERE DATE == "2019-01-01"
+        SELECT sales_data.Volume WHERE DATE == "2019-01-01" as Stock
         REMOVE missing FROM sales_data.Low
         EXPORT sales_data.Low TO "results/run.csv"
 
