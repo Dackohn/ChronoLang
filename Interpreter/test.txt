@@ -1,20 +1,20 @@
 LOAD sales_data FROM "Interpreter\Amazon.csv"
 
         TREND(sales_data.Open) -> forecast_next(7d)
-        FORECAST sales_data.Open USING ARIMA(model_order=2, seasonal_order=1)
+     
 
-        SELECT sales_data.ales_amount WHERE DATE > "2024-01-01"
+        SELECT sales_data.Volume WHERE DATE == "2019-01-01" as Stock
+        REMOVE missing FROM sales_data.Low
+        EXPORT sales_data.Low TO "results/run.csv"
 
         PLOT LINEPLOT(
-            data=[[100, 200, 150], [120, 220, 170]],
+            data=[sales_data.High,sales_data.Low],
             x_label="Days",
             y_label="Sales",
             title="Weekly Sales",
-            legend=["Week 1", "Week 2"]
+            legend=["1", "2"]
         )
-
         FOR i IN 1 TO 3 {
             FORECAST sales_data.Open USING Prophet(model_order=3, seasonal_order=2)
             EXPORT sales_data.Open TO "results/run_${i}.csv"
         }
-        
