@@ -6,9 +6,11 @@ chrono = cdll.LoadLibrary(dll_path)
 chrono.chrono_parse.argtypes = [c_char_p]
 chrono.chrono_parse.restype = c_char_p
 
-src = '''TREND(sales_data.sales_amount) -> forecast_next(7d)
-FORECAST sales_data.sales_amount USING ARIMA(model_order=2, seasonal_order=1)
-EXPORT sales_data.sales_amount TO "results/sales_amount.csv"
+src = '''SELECT sales.amount WHERE date > "2024-01-01" AS filtered
+        SELECT $filtered WHERE date > "2024-02-01" AS more_filtered
+        FORECAST $filtered USING ARIMA(param=1) AS predicted
+        TREND($filtered) -> forecast_next(12m) AS trend_line
+        EXPORT $predicted TO "pred.csv"
 '''
 
 src2 = '''LOAD sales_data FROM "data/sales.csv"

@@ -1,4 +1,4 @@
-//#pragma once
+#pragma once
 #include "../include/ast.h"
 #include <fstream>
 #include <sstream>
@@ -66,7 +66,7 @@ inline int drawASTNodeSimplified(const ASTNode* node, std::ostream& out, int& ne
             drawNode(out, thisId, label.str());
 
             int colNode = nextId++;
-            drawNode(out, colNode, "column: " + n->column);
+            drawNode(out, colNode, "column: " + n->table + "." + n->column);
             out << "  node" << thisId << " -> node" << colNode << ";\n";
 
             int nextNode = nextId++;
@@ -81,7 +81,7 @@ inline int drawASTNodeSimplified(const ASTNode* node, std::ostream& out, int& ne
             drawNode(out, thisId, label.str());
 
             int colNode = nextId++;
-            drawNode(out, colNode, "column: " + n->column);
+            drawNode(out, colNode, "column: " + n->table + "." + n->column);
             out << "  node" << thisId << " -> node" << colNode << ";\n";
 
             int modelNode = nextId++;
@@ -117,7 +117,7 @@ inline int drawASTNodeSimplified(const ASTNode* node, std::ostream& out, int& ne
             drawNode(out, thisId, label.str());
 
             int colNode = nextId++;
-            drawNode(out, colNode, "column: " + n->column);
+            drawNode(out, colNode, "column: " + n->table + "." + n->column);
             out << "  node" << thisId << " -> node" << colNode << ";\n";
 
             if (n->op && n->dateExpr) {
@@ -151,7 +151,8 @@ inline int drawASTNodeSimplified(const ASTNode* node, std::ostream& out, int& ne
             drawNode(out, thisId, label.str());
 
             int srcNode = nextId++;
-            drawNode(out, srcNode, "from: " + n->source);
+            std::string sourceLabel = n->column ? (n->table + "." + *n->column) : n->table;
+            drawNode(out, srcNode, "from: " + sourceLabel);
             out << "  node" << thisId << " -> node" << srcNode << ";\n";
 
             int tgtNode = nextId++;
@@ -164,35 +165,67 @@ inline int drawASTNodeSimplified(const ASTNode* node, std::ostream& out, int& ne
             const auto* n = dynamic_cast<const LoopStmtNode*>(node);
             label << "Loop";
             drawNode(out, thisId, label.str());
-
-            int rangeNode = nextId++;
-            drawNode(out, rangeNode, n->var + " in " + std::to_string(n->from) + " to " + std::to_string(n->to));
-            out << "  node" << thisId << " -> node" << rangeNode << ";\n";
-
+        
+            // Separate nodes for var, from, and to
+            int varNode = nextId++;
+            drawNode(out, varNode, "var: " + n->var);
+            out << "  node" << thisId << " -> node" << varNode << ";\n";
+        
+            int fromNode = nextId++;
+            drawNode(out, fromNode, "from: " + std::to_string(n->from));
+            out << "  node" << thisId << " -> node" << fromNode << ";\n";
+        
+            int toNode = nextId++;
+            drawNode(out, toNode, "to: " + std::to_string(n->to));
+            out << "  node" << thisId << " -> node" << toNode << ";\n";
+        
             for (const auto& stmt : n->body) {
                 int bodyId = drawASTNodeSimplified(stmt.get(), out, nextId);
                 out << "  node" << thisId << " -> node" << bodyId << ";\n";
             }
-
+        
             break;
         }
+        
         case ASTNodeType::Clean: {
             const auto* n = dynamic_cast<const CleanStmtNode*>(node);
             label << "Clean";
             drawNode(out, thisId, label.str());
-
-            int actionNode = nextId++;
-            std::ostringstream action;
+        
             if (n->action == CleanActionType::Remove) {
-                action << "REMOVE " << n->targetValue << " FROM " << n->column;
-            } else {
-                action << "REPLACE " << n->targetValue << " IN " << n->column << " WITH " << n->replaceWith;
+                int actionNode = nextId++;
+                drawNode(out, actionNode, "action: REMOVE");
+                out << "  node" << thisId << " -> node" << actionNode << ";\n";
+        
+                int targetNode = nextId++;
+                drawNode(out, targetNode, "target: " + n->targetValue);
+                out << "  node" << thisId << " -> node" << targetNode << ";\n";
+        
+                int columnNode = nextId++;
+                drawNode(out, columnNode, "from: " + n->column);
+                out << "  node" << thisId << " -> node" << columnNode << ";\n";
+        
+            } else if (n->action == CleanActionType::Replace) {
+                int actionNode = nextId++;
+                drawNode(out, actionNode, "action: REPLACE");
+                out << "  node" << thisId << " -> node" << actionNode << ";\n";
+        
+                int targetNode = nextId++;
+                drawNode(out, targetNode, "target: " + n->targetValue);
+                out << "  node" << thisId << " -> node" << targetNode << ";\n";
+        
+                int columnNode = nextId++;
+                drawNode(out, columnNode, "in: " + n->column);
+                out << "  node" << thisId << " -> node" << columnNode << ";\n";
+        
+                int replacementNode = nextId++;
+                drawNode(out, replacementNode, "with: " + n->replaceWith);
+                out << "  node" << thisId << " -> node" << replacementNode << ";\n";
             }
-            drawNode(out, actionNode, action.str());
-            out << "  node" << thisId << " -> node" << actionNode << ";\n";
-
+        
             break;
         }
+        
         default: {
             drawNode(out, thisId, "Unknown Node");
             break;
@@ -201,7 +234,6 @@ inline int drawASTNodeSimplified(const ASTNode* node, std::ostream& out, int& ne
 
     return thisId;
 }
-
 
 inline void drawParseTreeSimplified(const std::unique_ptr<ProgramNode>& root, const std::string& outputDotFile) {
     std::ofstream out(outputDotFile);

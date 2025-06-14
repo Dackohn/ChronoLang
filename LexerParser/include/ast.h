@@ -35,9 +35,24 @@ struct ProgramNode : public ASTNode {
 struct LoadStmtNode : public ASTNode {
     std::string id;
     std::string path;
-    LoadStmtNode(const std::string& id, const std::string& path, int line, int col)
-        : ASTNode(ASTNodeType::Load, line, col), id(id), path(path) {}
+    std::optional<std::string> alias; 
+
+    LoadStmtNode(const std::string& id, const std::string& path,
+                 std::optional<std::string> alias,
+                 int line, int col)
+        : ASTNode(ASTNodeType::Load, line, col),
+          id(id), path(path), alias(alias) {}
 };
+
+
+
+struct Reference {
+    bool isVariable;                            
+    std::string table;                         
+    std::optional<std::string> column;         
+    std::string variableName;                  
+};
+
 
 struct SetStmtNode : public ASTNode {
     int amount;
@@ -47,33 +62,37 @@ struct SetStmtNode : public ASTNode {
 };
 
 struct TransformStmtNode : public ASTNode {
-    std::string table;
-    std::string column;
+    Reference ref;
     int intervalAmount;
     std::string intervalUnit;
+    std::optional<std::string> alias;  // NEW
 
-    TransformStmtNode(const std::string& table, const std::string& column,
+    TransformStmtNode(const Reference& ref,
                       int amt, const std::string& unit,
+                      std::optional<std::string> alias, // NEW
                       int line, int col)
         : ASTNode(ASTNodeType::Transform, line, col),
-          table(table), column(column),
-          intervalAmount(amt), intervalUnit(unit) {}
+          ref(ref), intervalAmount(amt), intervalUnit(unit), alias(alias) {}
 };
+
 
 
 struct ForecastStmtNode : public ASTNode {
-    std::string table;
-    std::string column;
+    Reference ref;
     std::string model;
     std::vector<std::pair<std::string, int>> params;
+    std::optional<std::string> alias;  // NEW
 
-    ForecastStmtNode(const std::string& table, const std::string& column,
-                        const std::string& model,
-                        const std::vector<std::pair<std::string, int>>& params,
-                        int line, int col)
+    ForecastStmtNode(const Reference& ref,
+                     const std::string& model,
+                     const std::vector<std::pair<std::string, int>>& params,
+                     std::optional<std::string> alias, // NEW
+                     int line, int col)
         : ASTNode(ASTNodeType::Forecast, line, col),
-            table(table), column(column), model(model), params(params) {}
+          ref(ref), model(model), params(params), alias(alias) {}
 };
+
+
     
 
 struct StreamStmtNode : public ASTNode {
@@ -84,19 +103,21 @@ struct StreamStmtNode : public ASTNode {
 };
 
 struct SelectStmtNode : public ASTNode {
-    std::string table;
-    std::string column;
+    Reference ref;
     std::optional<std::string> op;
     std::optional<std::string> dateExpr;
+    std::optional<std::string> alias; // NEW
 
-    SelectStmtNode(const std::string& table,
-                   const std::string& column,
+    SelectStmtNode(const Reference& ref,
                    std::optional<std::string> op,
                    std::optional<std::string> dateExpr,
+                   std::optional<std::string> alias, // NEW
                    int line, int col)
         : ASTNode(ASTNodeType::Select, line, col),
-          table(table), column(column), op(op), dateExpr(dateExpr) {}
+          ref(ref), op(op), dateExpr(dateExpr), alias(alias) {}
 };
+
+
 
 
 struct PlotStmtNode : public ASTNode {
@@ -108,16 +129,14 @@ struct PlotStmtNode : public ASTNode {
 };
 
 struct ExportStmtNode : public ASTNode {
-    std::string table;
-    std::optional<std::string> column; 
+    Reference ref;
     std::string target;
 
-    ExportStmtNode(const std::string& table,
-                   std::optional<std::string> column,
+    ExportStmtNode(const Reference& ref,
                    const std::string& target,
                    int line, int col)
         : ASTNode(ASTNodeType::Export, line, col),
-          table(table), column(std::move(column)), target(target) {}
+          ref(ref), target(target) {}
 };
 
 

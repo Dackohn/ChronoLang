@@ -1,1 +1,1 @@
-drawParseTree(ast, "ast.dot");
+cl

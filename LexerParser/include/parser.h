@@ -13,6 +13,9 @@ public:
 private:
     const std::vector<Token>& tokens;
     size_t current = 0;
+    Reference parseReference();
+    std::optional<std::string> parseOptionalAlias();
+
 
     const Token& peek() const;
     const Token& previous() const;
