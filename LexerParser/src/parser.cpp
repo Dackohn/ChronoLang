@@ -287,10 +287,11 @@ ASTNodePtr Parser::parseCleanStatement() {
 
     if (isRemove) {
         expect(TokenType::FROM, "'FROM'");
-        std::string column = parseColumn();
+        auto [table, column] = parseTableAndColumn();
         return std::make_unique<CleanStmtNode>(
             CleanActionType::Remove,
             target.value,
+            table,
             column,
             "",
             first.line,
@@ -298,13 +299,14 @@ ASTNodePtr Parser::parseCleanStatement() {
         );
     } else { 
         expect(TokenType::IN, "'IN'");
-        std::string column = parseColumn();
+        auto [table, column] = parseTableAndColumn();
         expect(TokenType::WITH, "'WITH'");
         std::string replacement = parseValue();
         return std::make_unique<CleanStmtNode>(
             CleanActionType::Replace,
             target.value,
             column,
+            table,
             replacement,
             first.line,
             first.column
