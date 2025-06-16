@@ -1,39 +1,37 @@
 import subprocess
 from pathlib import Path
 import logging
+import sys
+import os
+
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'cl', 'Interpreter'))
+
+
+from Interpreter import execute_chronolang_json
 
 logger = logging.getLogger(__name__)
 
 def parse_code(code: str):
     try:
-        base_dir = Path(__file__).parent.parent.parent
-        interpreter_path = base_dir / 'cl' / 'Interpreter' / 'test.py'
+
+        import json
+        json_input = json.dumps({"code": code})
+
+        result = execute_chronolang_json(json_input)
         
-        if not interpreter_path.exists():
-            error_msg = f"Interpreter not found at {interpreter_path}"
-            logger.error(error_msg)
-            return {'error': error_msg}, 500
-        
-        result = subprocess.run(
-            ['python', str(interpreter_path), code],
-            capture_output=True,
-            text=True,
-            timeout=30 
-        )
-        
-        logger.debug(f"Interpreter stdout: {result.stdout}")
-        logger.debug(f"Interpreter stderr: {result.stderr}")
-        
-        if result.returncode == 0:
-            return {'result': result.stdout.strip()}, 200
+        logger.debug(f"Interpreter result: {result}")
+
+        if result.get('status') == 'error':
+            error_msg = result.get('message', 'Unknown error')
+            if 'traceback' in result:
+                logger.error(f"Interpreter traceback: {result['traceback']}")
+            return {'error': error_msg}, 400
+        elif result.get('status') == 'success':
+            return {'result': result.get('result', result.get('message', ''))}, 200
         else:
-            return {'error': result.stderr.strip() or 'Interpreter failed'}, 400
+
+            return {'result': str(result)}, 200
             
-    except subprocess.TimeoutExpired:
-        error_msg = "Interpreter timed out"
-        logger.error(error_msg)
-        return {'error': error_msg}, 408
-        
     except Exception as e:
         error_msg = f"Unexpected error: {str(e)}"
         logger.error(error_msg, exc_info=True)
