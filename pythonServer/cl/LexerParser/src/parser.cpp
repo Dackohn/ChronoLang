@@ -91,12 +91,30 @@ ASTNodePtr Parser::parseStatement() {
     throw std::runtime_error("Unexpected token at line " + std::to_string(peek().line));
 }
 
+Reference Parser::parseReference() {
+    if (match(TokenType::DOLLAR_ID)) {
+        return Reference{true, "", std::nullopt, previous().value};
+    }
+
+    expect(TokenType::ID, "table or column name");
+    std::string table = previous().value;
+    std::optional<std::string> column;
+    if (match(TokenType::DOT)) {
+        expect(TokenType::ID, "column name after '.'");
+        column = previous().value;
+    }
+    return Reference{false, table, column, ""};
+}
+
+
 ASTNodePtr Parser::parseLoadStatement() {
     Token id = advance();
     expect(TokenType::FROM, "'FROM'");
     Token path = advance();
-    return std::make_unique<LoadStmtNode>(id.value, path.value, id.line, id.column);
+    auto alias = parseOptionalAlias(); 
+    return std::make_unique<LoadStmtNode>(id.value, path.value, alias, id.line, id.column);
 }
+
 
 ASTNodePtr Parser::parseSetStatement() {
     expect(TokenType::WINDOW, "'WINDOW'");
@@ -107,37 +125,35 @@ ASTNodePtr Parser::parseSetStatement() {
 
 ASTNodePtr Parser::parseTransformStatement() {
     expect(TokenType::LPAREN, "'('");
-    auto [table, column] = parseTableAndColumn();
+    Reference ref = parseReference(); 
     expect(TokenType::RPAREN, "')'");
     expect(TokenType::ARROW, "'->'");
     expect(TokenType::ID, "'forecast_next'");
     expect(TokenType::LPAREN, "'('");
     auto [amount, unit] = parseTimeInterval();
     expect(TokenType::RPAREN, "')'");
-
-    if (!column.has_value())
-        throw std::runtime_error("TREND requires a table.column reference");
+    auto alias = parseOptionalAlias(); 
 
     return std::make_unique<TransformStmtNode>(
-        table, *column, amount, unit, peek().line, peek().column
+        ref, amount, unit, alias, peek().line, peek().column
     );
 }
 
+
 ASTNodePtr Parser::parseForecastStatement() {
-    auto [table, column] = parseTableAndColumn();
+    Reference ref = parseReference();
     expect(TokenType::USING, "'USING'");
     Token model = advance();
     expect(TokenType::LPAREN, "'('");
     auto params = parseParams();
     expect(TokenType::RPAREN, "')'");
-
-    if (!column.has_value())
-        throw std::runtime_error("FORECAST requires a table.column reference");
+    auto alias = parseOptionalAlias();
 
     return std::make_unique<ForecastStmtNode>(
-        table, *column, model.value, params, model.line, model.column
+        ref, model.value, params, alias, model.line, model.column
     );
 }
+
 
 ASTNodePtr Parser::parseStreamStatement() {
     Token id = advance();
@@ -147,7 +163,7 @@ ASTNodePtr Parser::parseStreamStatement() {
 }
 
 ASTNodePtr Parser::parseSelectStatement() {
-    auto [table, column] = parseTableAndColumn();
+    Reference ref = parseReference();
     std::optional<std::string> op, date;
     if (match(TokenType::WHERE)) {
         expect(TokenType::DATE, "'DATE'");
@@ -156,14 +172,13 @@ ASTNodePtr Parser::parseSelectStatement() {
         op = oper.value;
         date = expr.value;
     }
-
-    if (!column.has_value())
-        throw std::runtime_error("SELECT requires a table.column reference");
-
+    auto alias = parseOptionalAlias(); 
     return std::make_unique<SelectStmtNode>(
-        table, *column, op, date, peek().line, peek().column
+        ref, op, date, alias, peek().line, peek().column
     );
 }
+
+
 
 ASTNodePtr Parser::parsePlotStatement() {
     Token plotType = advance();
@@ -217,20 +232,21 @@ ASTNodePtr Parser::parsePlotStatement() {
 
 
 ASTNodePtr Parser::parseExportStatement() {
-    expect(TokenType::ID, "table or column name");
-    std::string table = previous().value;
-    std::optional<std::string> column;
-
-    if (match(TokenType::DOT)) {
-        expect(TokenType::ID, "column name after '.'");
-        column = previous().value;
-    }
-
+    Reference ref = parseReference();
     expect(TokenType::TO, "'TO'");
     Token target = advance();
+    return std::make_unique<ExportStmtNode>(ref, target.value, ref.isVariable ? target.line : ref.table.length(), target.column);
 
-    return std::make_unique<ExportStmtNode>(table, column, target.value, table.length(), target.column);
 }
+
+std::optional<std::string> Parser::parseOptionalAlias() {
+    if (match(TokenType::AS)) {
+        expect(TokenType::ID, "alias variable after AS");
+        return previous().value;
+    }
+    return std::nullopt;
+}
+
 
 
 
@@ -300,7 +316,7 @@ ASTNodePtr Parser::parseCleanStatement() {
 
 
 std::pair<int, std::string> Parser::parseTimeInterval() {
-    expect(TokenType::TIME_UNIT, "time interval (e.g., 30d, 5h, 10m)");
+    expect(TokenType::TIME_UNIT, "time interval ");
 
     std::string value = previous().value;
 

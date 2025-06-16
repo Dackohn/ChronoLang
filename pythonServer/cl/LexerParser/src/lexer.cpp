@@ -25,6 +25,20 @@ Token Lexer::nextToken() {
     if (pos >= input.size()) return makeToken(TokenType::END_OF_FILE, "");
 
     char c = peek();
+
+    if (c == '$') {
+        advance(); 
+        size_t start = pos;
+        int startColumn = column;
+        if (std::isalpha(peek()) || peek() == '_') {
+            while (std::isalnum(peek()) || peek() == '_') advance();
+            std::string varname = input.substr(start, pos - start);
+            return Token(TokenType::DOLLAR_ID, varname, line, startColumn);
+        } else {
+            return makeToken(TokenType::INVALID, "$");
+        }
+    }
+
     if (std::isalpha(c) || c == '_') return makeIdentifierOrKeyword();
     if (std::isdigit(c)) return makeNumber();
     if (c == '"') return makeString();
@@ -66,7 +80,7 @@ Token Lexer::makeIdentifierOrKeyword() {
         {"WINDOW", TokenType::WINDOW}, {"TREND", TokenType::TREND},
         {"FORECAST", TokenType::FORECAST}, {"USING", TokenType::USING},
         {"STREAM", TokenType::STREAM}, {"SELECT", TokenType::SELECT},
-        {"WHERE", TokenType::WHERE}, {"DATE", TokenType::DATE},
+        {"WHERE", TokenType::WHERE}, {"DATE", TokenType::DATE}, {"AS", TokenType::AS},
         {"PLOT", TokenType::PLOT}, {"EXPORT", TokenType::EXPORT},
         {"TO", TokenType::TO}, {"FOR", TokenType::FOR}, {"IN", TokenType::IN},
         {"REMOVE", TokenType::REMOVE}, {"MISSING", TokenType::MISSING},
@@ -172,6 +186,7 @@ static std::string tokenTypeToString(TokenType type) {
         case TokenType::WHERE: return "WHERE";
         case TokenType::DATE: return "DATE";
         case TokenType::PLOT: return "PLOT";
+        case TokenType::AS: return "AS";
         case TokenType::EXPORT: return "EXPORT";
         case TokenType::TO: return "TO";
         case TokenType::FOR: return "FOR";
@@ -186,6 +201,7 @@ static std::string tokenTypeToString(TokenType type) {
         case TokenType::ABOVE: return "ABOVE";
         case TokenType::MEAN: return "MEAN";
         case TokenType::MEDIAN: return "MEDIAN";
+        case TokenType::DOLLAR_ID: return "DOLLAR_ID";
         case TokenType::TENDENCY: return "TENDENCY";
         case TokenType::ARIMA: return "ARIMA";
         case TokenType::PROPHET: return "PROPHET";

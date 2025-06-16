@@ -78,25 +78,11 @@ def run_chronolang_json(code_or_json):
 # Example usage
 if __name__ == "__main__":
     test_code = """
-    LOAD sales_data FROM "Amazon.csv"
-
-    TREND(sales_data.Open) -> forecast_next(7d)
-
-    SELECT sales_data.Volume WHERE DATE == "2019-01-01" 
-    REMOVE missing FROM sales_data.Low
-    EXPORT sales_data.Low TO "results/run.csv"
-
-    PLOT LINEPLOT(
-        data=[sales_data.High,sales_data.Low],
-        x_label="Days",
-        y_label="Sales",
-        title="Weekly Sales",
-        legend=["1", "2"]
-    )
-    FOR i IN 1 TO 3 {
-        FORECAST sales_data.Open USING Prophet(model_order=3, seasonal_order=2)
-        EXPORT sales_data.Open TO "results/run1.csv"
-    }
+        SELECT sales.amount WHERE date > "2024-01-01" AS filtered
+        SELECT $filtered WHERE date > "2024-02-01" AS more_filtered
+        FORECAST $filtered USING ARIMA(param=1) AS predicted
+        TREND($filtered) -> forecast_next(12m) AS trend_line
+        EXPORT $predicted TO "pred.csv"
     """
     
     result = run_chronolang_json(test_code)

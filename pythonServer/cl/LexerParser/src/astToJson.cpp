@@ -11,38 +11,59 @@ json astToJson(const ASTNode* node) {
         }
         case ASTNodeType::Load: {
             auto* n = dynamic_cast<const LoadStmtNode*>(node);
-            return { {"type", "Load"}, {"id", n->id}, {"path", n->path} };
+            json j = { {"type", "Load"}, {"id", n->id}, {"path", n->path} };
+            if (n->alias.has_value())
+                j["alias"] = *n->alias;
+            return j;
         }
+
         case ASTNodeType::Set: {
             auto* n = dynamic_cast<const SetStmtNode*>(node);
             return { {"type", "Set"}, {"amount", n->amount}, {"unit", n->unit} };
         }
         case ASTNodeType::Transform: {
             auto* n = dynamic_cast<const TransformStmtNode*>(node);
-            return {
-                {"type", "Transform"},
-                {"table", n->table},
-                {"column", n->column},
-                {"interval", {
-                    {"amount", n->intervalAmount},
-                    {"unit", n->intervalUnit}
-                }}
+            json j = { {"type", "Transform"} };
+            if (n->ref.isVariable) {
+                j["variable"] = n->ref.variableName;
+            } else {
+                j["table"] = n->ref.table;
+                if (n->ref.column.has_value())
+                    j["column"] = *n->ref.column;
+            }
+            j["interval"] = {
+                {"amount", n->intervalAmount},
+                {"unit", n->intervalUnit}
             };
-        }        
+            if (n->alias.has_value())
+                j["alias"] = *n->alias;
+            return j;
+        }
+       
         case ASTNodeType::Forecast: {
             auto* n = dynamic_cast<const ForecastStmtNode*>(node);
             json paramsJson;
             for (const auto& p : n->params)
                 paramsJson[p.first] = p.second;
-        
-            return {
+
+            json j = {
                 {"type", "Forecast"},
-                {"table", n->table},
-                {"column", n->column},
                 {"model", n->model},
                 {"params", paramsJson}
             };
+            if (n->ref.isVariable) {
+                j["variable"] = n->ref.variableName;
+            } else {
+                j["table"] = n->ref.table;
+                if (n->ref.column.has_value())
+                    j["column"] = *n->ref.column;
+            }
+            if (n->alias.has_value())
+                j["alias"] = *n->alias;
+            return j;
         }
+
+
         
         case ASTNodeType::Stream: {
             auto* n = dynamic_cast<const StreamStmtNode*>(node);
@@ -50,19 +71,23 @@ json astToJson(const ASTNode* node) {
         }
         case ASTNodeType::Select: {
             auto* n = dynamic_cast<const SelectStmtNode*>(node);
-            json j = {
-                {"type", "Select"},
-                {"table", n->table},
-                {"column", n->column}
-            };
-            if (n->op && n->dateExpr) {
-                j["condition"] = {
-                    {"op", *n->op},
-                    {"date", *n->dateExpr}
-                };
+            json j = { {"type", "Select"} };
+            if (n->ref.isVariable) {
+                j["variable"] = n->ref.variableName;
+            } else {
+                j["table"] = n->ref.table;
+                if (n->ref.column.has_value())
+                    j["column"] = *n->ref.column;
             }
+            if (n->op && n->dateExpr) {
+                j["condition"] = { {"op", *n->op}, {"date", *n->dateExpr} };
+            }
+            if (n->alias.has_value())
+                j["alias"] = *n->alias;
             return j;
         }
+
+
         case ASTNodeType::Plot: {
             auto* n = dynamic_cast<const PlotStmtNode*>(node);
             json argsJson = json::object();
@@ -74,14 +99,18 @@ json astToJson(const ASTNode* node) {
             auto* n = dynamic_cast<const ExportStmtNode*>(node);
             json j = {
                 {"type", "Export"},
-                {"table", n->table},
                 {"to", n->target}
             };
-            if (n->column.has_value()) {
-                j["column"] = *n->column;
+            if (n->ref.isVariable) {
+                j["variable"] = n->ref.variableName;
+            } else {
+                j["table"] = n->ref.table;
+                if (n->ref.column.has_value())
+                    j["column"] = *n->ref.column;
             }
             return j;
         }
+
         
         case ASTNodeType::Loop: {
             auto* n = dynamic_cast<const LoopStmtNode*>(node);
