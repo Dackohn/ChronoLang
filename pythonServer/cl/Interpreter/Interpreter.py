@@ -1144,6 +1144,7 @@ def execute_chronolang_json(json_input):
 
         # Execute the AST
         result = interpret(ast)
+        print(result)
         return result
 
     except Exception as e:
@@ -1174,32 +1175,32 @@ def get_datasets_info():
         return {"status": "error", "message": f"Failed to get datasets: {str(e)}"}
 
 #Example usage (for testing)
-# if __name__ == '__main__':
-#     # Example of how to use the functions
+if __name__ == '__main__':
+    # Example of how to use the functions
 
-#     # Test with ChronoLang code
-#     test_code = {
-#         "code": """LOAD sales_data FROM "Amazon.csv"
+    # Test with ChronoLang code
+    test_code = {
+        "code": """LOAD sales_data FROM "Amazon.csv"
 
-#         TREND(sales_data.Open) -> forecast_next(7d)
+        TREND(sales_data.Open) -> forecast_next(7d)
 
 
-#         SELECT sales_data.Low WHERE DATE < "2019-01-01" AS var_1
-#         REMOVE missing FROM sales_data.Low
-#         EXPORT sales_data.Low TO "../results/run3.csv"
+        SELECT sales_data.Low WHERE DATE < "2019-01-01" AS var_1
+        REMOVE missing FROM sales_data.Low
+        EXPORT sales_data.Low TO "../results/run3.csv"
 
-#         FORECAST $var_1 USING Prophet(model_order=3, seasonal_order=2)
-#         PLOT histogram(
-#             data=[$var_1],
-#             x_label="Days",
-#             y_label="Sales",
-#             bins=10,
-#             title="Weekly Sales"
-#         )
-# """
-#     }
+        FORECAST $var_1 USING Prophet(model_order=3, seasonal_order=2)
+        PLOT histogram(
+            data=[$var_1],
+            x_label="Days",
+            y_label="Sales",
+            bins=10,
+            title="Weekly Sales"
+        )
+"""
+    }
 
-#     result = execute_chronolang_json(test_code)
-#     datasets_info = get_datasets_info()
-#     print(result)
-#     print(datasets_info)
+    result = execute_chronolang_json(test_code)
+    #datasets_info = get_datasets_info()
+    print(result)
+    #print(datasets_info)

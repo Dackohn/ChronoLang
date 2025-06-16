@@ -11,15 +11,34 @@ def handle_parse_request():
             'success': False,
             'error': 'Missing code in request'
         }), 400
-    
+
     try:
-        result = parse_code(data['code'])
-        
+        result, status_code = parse_code(data['code'])
+
+        # Expect interpreter to return {status: ..., results: [...]}
+        # Prepare output for text, table, structure
+        text_out = ""
+        table_out = []
+        structure_out = None
+
+        if isinstance(result, dict) and "results" in result:
+            # results is a list of dicts, each with "status", "message", possibly others
+            text_out = "\n\n".join(str(item.get("message", item)) for item in result["results"])
+            table_out = result["results"]
+            structure_out = result
+        else:
+            # fallback for error or other shape
+            text_out = str(result)
+            structure_out = result
+
         return jsonify({
             'success': True,
-            'result': result[0]['result'], 
-            'ast': {} 
-        })
+            'result': {
+                'text': text_out,
+                'table': table_out,
+                'structure': structure_out
+            }
+        }), status_code
     except Exception as e:
         return jsonify({
             'success': False,

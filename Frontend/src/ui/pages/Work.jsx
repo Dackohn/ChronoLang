@@ -24,22 +24,13 @@ const Work = () => {
 
     try {
       const response = await parseCode(code);
-      
-      if (response.success) {
-        try {
-          const parsedData = JSON.parse(response.result);
-          setOutput({
-            text: typeof parsedData === "string" ? parsedData : response.result,
-            table: Array.isArray(parsedData) ? parsedData : [],
-            structure: parsedData
-          });
-        } catch {
-          setOutput({
-            text: response.result,
-            table: [],
-            structure: null
-          });
-        }
+
+      if (response.success && response.result) {
+        setOutput({
+          text: response.result.text || "",
+          table: Array.isArray(response.result.table) ? response.result.table : [],
+          structure: response.result.structure || null
+        });
       } else {
         throw new Error(response.error || "Execution failed");
       }
@@ -49,6 +40,7 @@ const Work = () => {
       setIsLoading(false);
     }
   };
+  console.log("structure output", output.structure);
 
   const renderOutput = () => {
     if (error) {
@@ -96,17 +88,47 @@ const Work = () => {
             )}
           </div>
         );
-      case "structure":
-        return (
-          <div className="output-structure">
-            <h3>Structured Data</h3>
-            <pre>
-              {output.structure 
-                ? JSON.stringify(output.structure, null, 2)
-                : "No structured data"}
-            </pre>
+      case "structure": {
+  // Support both {results: [...]} and [...] forms
+  let plots = [];
+  let resultArr = [];
+
+  if (Array.isArray(output.structure)) {
+    resultArr = output.structure;
+  } else if (
+    output.structure &&
+    typeof output.structure === "object" &&
+    Array.isArray(output.structure.results)
+  ) {
+    resultArr = output.structure.results;
+  }
+
+  plots = resultArr.filter(item => !!item.plot);
+
+  return (
+    <div className="output-structure">
+      <h3>Plots</h3>
+      {plots.length > 0 ? (
+        plots.map((item, idx) => (
+          <div key={idx} style={{ margin: "16px 0" }}>
+            <img
+              src={`data:image/png;base64,${item.plot}`}
+              alt={`Plot ${idx + 1}`}
+              style={{ maxWidth: "100%", border: "1px solid #ccc" }}
+            />
+            <div style={{ marginTop: "8px", fontStyle: "italic", color: "#333" }}>
+              {item.message}
+            </div>
           </div>
-        );
+        ))
+      ) : (
+        <div>No plots available</div>
+      )}
+    </div>
+  );
+}
+
+
       default:
         return null;
     }
@@ -115,7 +137,7 @@ const Work = () => {
   return (
     <div className="work-container">
       <h1>ChronoLang Interpreter</h1>
-      
+
       <div className="editor-container">
         <div className="code-editor">
           <textarea
