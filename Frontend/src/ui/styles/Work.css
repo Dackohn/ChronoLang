@@ -1,0 +1,50 @@
+/* Loading state */
+.output-content:empty::after {
+  content: "Processing...";
+  color: #666;
+}
+
+/* Error state */
+.output-box.error {
+  border-color: #ff4444;
+}
+
+.output-box.error h3 {
+  color: #ff4444;
+}
+
+.output-box.error .output-content {
+  color: #ff4444;
+  white-space: pre-wrap;
+}
+
+/* JSON pre formatting */
+pre {
+  background: #f5f5f5;
+  padding: 10px;
+  border-radius: 4px;
+  overflow-x: auto;
+}
+
+/* Disabled state */
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Table output */
+.output-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.output-table td {
+  border: 1px solid #ddd;
+  padding: 8px;
+  text-align: left;
+}
+
+.output-table td:empty::after {
+  content: "-";
+  color: #ccc;
+}
