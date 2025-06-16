@@ -1093,7 +1093,7 @@ def interpret(ast: dict):
                     if action == 'remove':
                         result = clean_column(table_name, column_name, "delete")
                     elif action == 'replace':
-                        result = clean_column(table_name, column_name, "replace", statement.get('replaceWith'))
+                        result = clean_column(table_name, column_name, "replace", statement.get('with'))
                     else:
                         result = {"status": "error", "message": f"Unknown clean action: {action}"}
                 else:
