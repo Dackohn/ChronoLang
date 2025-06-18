@@ -5,6 +5,7 @@
 #include <string>
 #include <iostream>
 
+// Utility to escape labels for DOT
 inline std::string escapeLabel(const std::string& s) {
     std::string out;
     for (char c : s) {
@@ -35,7 +36,7 @@ inline int drawASTNodeSimplified(const ASTNode* node, std::ostream& out, int& ne
             break;
         }
         case ASTNodeType::Load: {
-            const auto* n = dynamic_cast<const LoadStmtNode*>(node);
+            auto* n = dynamic_cast<const LoadStmtNode*>(node);
             label << "Load";
             drawNode(out, thisId, label.str());
 
@@ -47,42 +48,53 @@ inline int drawASTNodeSimplified(const ASTNode* node, std::ostream& out, int& ne
             drawNode(out, pathNode, "path: " + n->path);
             out << "  node" << thisId << " -> node" << pathNode << ";\n";
 
+            if (n->alias.has_value()) {
+                int aliasNode = nextId++;
+                drawNode(out, aliasNode, "alias: " + *n->alias);
+                out << "  node" << thisId << " -> node" << aliasNode << ";\n";
+            }
             break;
         }
         case ASTNodeType::Set: {
-            const auto* n = dynamic_cast<const SetStmtNode*>(node);
+            auto* n = dynamic_cast<const SetStmtNode*>(node);
             label << "Set";
             drawNode(out, thisId, label.str());
 
             int winNode = nextId++;
             drawNode(out, winNode, "window: " + std::to_string(n->amount) + n->unit);
             out << "  node" << thisId << " -> node" << winNode << ";\n";
-
             break;
         }
         case ASTNodeType::Transform: {
-            const auto* n = dynamic_cast<const TransformStmtNode*>(node);
+            auto* n = dynamic_cast<const TransformStmtNode*>(node);
             label << "Transform";
             drawNode(out, thisId, label.str());
 
-            int colNode = nextId++;
-            drawNode(out, colNode, "column: " + n->table + "." + n->column);
-            out << "  node" << thisId << " -> node" << colNode << ";\n";
+            int refNode = nextId++;
+            std::string ref = n->ref.isVariable ? n->ref.variableName : (n->ref.table + (n->ref.column ? ("." + *n->ref.column) : ""));
+            drawNode(out, refNode, "ref: " + ref);
+            out << "  node" << thisId << " -> node" << refNode << ";\n";
 
-            int nextNode = nextId++;
-            drawNode(out, nextNode, "forecast_next: " + std::to_string(n->intervalAmount) + n->intervalUnit);
-            out << "  node" << thisId << " -> node" << nextNode << ";\n";
+            int intvNode = nextId++;
+            drawNode(out, intvNode, "interval: " + std::to_string(n->intervalAmount) + n->intervalUnit);
+            out << "  node" << thisId << " -> node" << intvNode << ";\n";
 
+            if (n->alias.has_value()) {
+                int aliasNode = nextId++;
+                drawNode(out, aliasNode, "alias: " + *n->alias);
+                out << "  node" << thisId << " -> node" << aliasNode << ";\n";
+            }
             break;
         }
         case ASTNodeType::Forecast: {
-            const auto* n = dynamic_cast<const ForecastStmtNode*>(node);
+            auto* n = dynamic_cast<const ForecastStmtNode*>(node);
             label << "Forecast";
             drawNode(out, thisId, label.str());
 
-            int colNode = nextId++;
-            drawNode(out, colNode, "column: " + n->table + "." + n->column);
-            out << "  node" << thisId << " -> node" << colNode << ";\n";
+            int refNode = nextId++;
+            std::string ref = n->ref.isVariable ? n->ref.variableName : (n->ref.table + (n->ref.column ? ("." + *n->ref.column) : ""));
+            drawNode(out, refNode, "ref: " + ref);
+            out << "  node" << thisId << " -> node" << refNode << ";\n";
 
             int modelNode = nextId++;
             drawNode(out, modelNode, "model: " + n->model);
@@ -93,11 +105,15 @@ inline int drawASTNodeSimplified(const ASTNode* node, std::ostream& out, int& ne
                 drawNode(out, paramNode, p.first + " = " + std::to_string(p.second));
                 out << "  node" << thisId << " -> node" << paramNode << ";\n";
             }
-
+            if (n->alias.has_value()) {
+                int aliasNode = nextId++;
+                drawNode(out, aliasNode, "alias: " + *n->alias);
+                out << "  node" << thisId << " -> node" << aliasNode << ";\n";
+            }
             break;
         }
         case ASTNodeType::Stream: {
-            const auto* n = dynamic_cast<const StreamStmtNode*>(node);
+            auto* n = dynamic_cast<const StreamStmtNode*>(node);
             label << "Stream";
             drawNode(out, thisId, label.str());
 
@@ -108,28 +124,32 @@ inline int drawASTNodeSimplified(const ASTNode* node, std::ostream& out, int& ne
             int pathNode = nextId++;
             drawNode(out, pathNode, "path: " + n->path);
             out << "  node" << thisId << " -> node" << pathNode << ";\n";
-
             break;
         }
         case ASTNodeType::Select: {
-            const auto* n = dynamic_cast<const SelectStmtNode*>(node);
+            auto* n = dynamic_cast<const SelectStmtNode*>(node);
             label << "Select";
             drawNode(out, thisId, label.str());
 
-            int colNode = nextId++;
-            drawNode(out, colNode, "column: " + n->table + "." + n->column);
-            out << "  node" << thisId << " -> node" << colNode << ";\n";
+            int refNode = nextId++;
+            std::string ref = n->ref.isVariable ? n->ref.variableName : (n->ref.table + (n->ref.column ? ("." + *n->ref.column) : ""));
+            drawNode(out, refNode, "ref: " + ref);
+            out << "  node" << thisId << " -> node" << refNode << ";\n";
 
             if (n->op && n->dateExpr) {
                 int condNode = nextId++;
                 drawNode(out, condNode, "where: DATE " + *n->op + " " + *n->dateExpr);
                 out << "  node" << thisId << " -> node" << condNode << ";\n";
             }
-
+            if (n->alias.has_value()) {
+                int aliasNode = nextId++;
+                drawNode(out, aliasNode, "alias: " + *n->alias);
+                out << "  node" << thisId << " -> node" << aliasNode << ";\n";
+            }
             break;
         }
         case ASTNodeType::Plot: {
-            const auto* n = dynamic_cast<const PlotStmtNode*>(node);
+            auto* n = dynamic_cast<const PlotStmtNode*>(node);
             label << "Plot";
             drawNode(out, thisId, label.str());
 
@@ -142,96 +162,76 @@ inline int drawASTNodeSimplified(const ASTNode* node, std::ostream& out, int& ne
                 drawNode(out, argNode, arg.first + " = " + arg.second);
                 out << "  node" << thisId << " -> node" << argNode << ";\n";
             }
-
             break;
         }
         case ASTNodeType::Export: {
-            const auto* n = dynamic_cast<const ExportStmtNode*>(node);
+            auto* n = dynamic_cast<const ExportStmtNode*>(node);
             label << "Export";
             drawNode(out, thisId, label.str());
 
-            int srcNode = nextId++;
-            std::string sourceLabel = n->column ? (n->table + "." + *n->column) : n->table;
-            drawNode(out, srcNode, "from: " + sourceLabel);
-            out << "  node" << thisId << " -> node" << srcNode << ";\n";
+            int refNode = nextId++;
+            std::string ref = n->ref.isVariable ? n->ref.variableName : (n->ref.table + (n->ref.column ? ("." + *n->ref.column) : ""));
+            drawNode(out, refNode, "ref: " + ref);
+            out << "  node" << thisId << " -> node" << refNode << ";\n";
 
             int tgtNode = nextId++;
             drawNode(out, tgtNode, "to: " + n->target);
             out << "  node" << thisId << " -> node" << tgtNode << ";\n";
-
             break;
         }
         case ASTNodeType::Loop: {
-            const auto* n = dynamic_cast<const LoopStmtNode*>(node);
+            auto* n = dynamic_cast<const LoopStmtNode*>(node);
             label << "Loop";
             drawNode(out, thisId, label.str());
-        
-            // Separate nodes for var, from, and to
+
             int varNode = nextId++;
             drawNode(out, varNode, "var: " + n->var);
             out << "  node" << thisId << " -> node" << varNode << ";\n";
-        
+
             int fromNode = nextId++;
             drawNode(out, fromNode, "from: " + std::to_string(n->from));
             out << "  node" << thisId << " -> node" << fromNode << ";\n";
-        
+
             int toNode = nextId++;
             drawNode(out, toNode, "to: " + std::to_string(n->to));
             out << "  node" << thisId << " -> node" << toNode << ";\n";
-        
+
             for (const auto& stmt : n->body) {
                 int bodyId = drawASTNodeSimplified(stmt.get(), out, nextId);
                 out << "  node" << thisId << " -> node" << bodyId << ";\n";
             }
-        
             break;
         }
-        
         case ASTNodeType::Clean: {
-            const auto* n = dynamic_cast<const CleanStmtNode*>(node);
+            auto* n = dynamic_cast<const CleanStmtNode*>(node);
             label << "Clean";
             drawNode(out, thisId, label.str());
-        
-            if (n->action == CleanActionType::Remove) {
-                int actionNode = nextId++;
-                drawNode(out, actionNode, "action: REMOVE");
-                out << "  node" << thisId << " -> node" << actionNode << ";\n";
-        
-                int targetNode = nextId++;
-                drawNode(out, targetNode, "target: " + n->targetValue);
-                out << "  node" << thisId << " -> node" << targetNode << ";\n";
-        
+
+            int actionNode = nextId++;
+            drawNode(out, actionNode, "action: " + std::string(n->action == CleanActionType::Remove ? "REMOVE" : "REPLACE"));
+            out << "  node" << thisId << " -> node" << actionNode << ";\n";
+
+            int targetNode = nextId++;
+            drawNode(out, targetNode, "target: " + n->targetValue);
+            out << "  node" << thisId << " -> node" << targetNode << ";\n";
+
+            if (!n->column.empty()) {
                 int columnNode = nextId++;
-                drawNode(out, columnNode, "from: " + n->column);
+                drawNode(out, columnNode, "column: " + n->column);
                 out << "  node" << thisId << " -> node" << columnNode << ";\n";
-        
-            } else if (n->action == CleanActionType::Replace) {
-                int actionNode = nextId++;
-                drawNode(out, actionNode, "action: REPLACE");
-                out << "  node" << thisId << " -> node" << actionNode << ";\n";
-        
-                int targetNode = nextId++;
-                drawNode(out, targetNode, "target: " + n->targetValue);
-                out << "  node" << thisId << " -> node" << targetNode << ";\n";
-        
-                int columnNode = nextId++;
-                drawNode(out, columnNode, "in: " + n->column);
-                out << "  node" << thisId << " -> node" << columnNode << ";\n";
-        
+            }
+            if (n->action == CleanActionType::Replace) {
                 int replacementNode = nextId++;
                 drawNode(out, replacementNode, "with: " + n->replaceWith);
                 out << "  node" << thisId << " -> node" << replacementNode << ";\n";
             }
-        
             break;
         }
-        
         default: {
             drawNode(out, thisId, "Unknown Node");
             break;
         }
     }
-
     return thisId;
 }
 

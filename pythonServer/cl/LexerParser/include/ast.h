@@ -158,12 +158,13 @@ struct CleanStmtNode : public ASTNode {
     std::string column;       
     std::string replaceWith;  
 
-    CleanStmtNode(CleanActionType action,
-                  const std::string& targetValue,
-                  const std::string& column,
-                  const std::string& replaceWith,
-                  int line, int col)
-                  : ASTNode(ASTNodeType::Clean, line, col),
+    // In ast.h, CleanStmtNode
+CleanStmtNode(CleanActionType action,
+              const std::string& targetValue,
+              const std::string& column,
+              const std::string& replaceWith,
+              int line, int col)
+                : ASTNode(ASTNodeType::Clean, line, col),
           action(action),
           targetValue(targetValue),
           column(column),

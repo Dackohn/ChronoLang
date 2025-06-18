@@ -291,7 +291,6 @@ ASTNodePtr Parser::parseCleanStatement() {
         return std::make_unique<CleanStmtNode>(
             CleanActionType::Remove,
             target.value,
-            table,
             column,
             "",
             first.line,
@@ -306,7 +305,6 @@ ASTNodePtr Parser::parseCleanStatement() {
             CleanActionType::Replace,
             target.value,
             column,
-            table,
             replacement,
             first.line,
             first.column

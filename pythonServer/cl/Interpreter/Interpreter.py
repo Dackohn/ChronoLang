@@ -38,8 +38,12 @@ def load_statement(identifier: str, data_source: str):
         return {"status": "error", "message": f"Failed to load {identifier}: {str(e)}"}
 
 
-def export_statement(identifier: str, column: str, destination: str):
-    """Exports a dataset column or a forecast result to a CSV file."""
+def export_statement(identifier: str, column: str = None, destination: str = None):
+    """
+    Exports a dataset column, a whole dataset, or a forecast/variable result to a CSV file.
+    """
+
+    import pandas as pd
 
     # Handle variable references (starting with $)
     if identifier.startswith('$'):
@@ -48,40 +52,53 @@ def export_statement(identifier: str, column: str, destination: str):
             return {"status": "error", "message": f"Variable ${var_name} not found."}
 
         # Get the data from the variable
-        if isinstance(variables[var_name], dict):
-            if 'data' in variables[var_name]:
-                # It's a select result
-                var_data = variables[var_name]['data']
-                df = pd.DataFrame({column: list(var_data.values())})
-            elif 'forecast' in variables[var_name]:
-                # It's a forecast result
-                df = pd.DataFrame({column: variables[var_name]['forecast']})
+        var = variables[var_name]
+
+        # Handle select/forecast results as dicts
+        if isinstance(var, dict):
+            if 'data' in var:
+                # It's a select result: var['data'] is a dict of values
+                var_data = var['data']
+                col_name = column or "values"
+                df = pd.DataFrame({col_name: list(var_data.values())})
+            elif 'forecast' in var:
+                col_name = column or "forecast"
+                if 'full_series' in var:
+                    df = pd.DataFrame({col_name: var['full_series']})
+                else:
+                    df = pd.DataFrame({col_name: var['forecast']})
             else:
-                return {"status": "error", "message": f"Variable ${var_name} doesn't contain exportable data."}
-        elif hasattr(variables[var_name], 'columns'):
-            df = variables[var_name]
+                # Fallback: Try exporting everything in the dict as columns
+                df = pd.DataFrame(var)
+        elif hasattr(var, 'columns'):
+            df = var
+        elif isinstance(var, list):
+            # Just a list: export as one column
+            col_name = column or "values"
+            df = pd.DataFrame({col_name: var})
         else:
-            return {"status": "error", "message": f"Variable ${var_name} is not a valid dataset."}
+            return {"status": "error", "message": f"Variable ${var_name} is not a valid dataset or column."}
     else:
         # Handle regular dataset references
         if identifier not in datasets:
             return {"status": "error", "message": f"Dataset '{identifier}' not found."}
         df = datasets[identifier]
 
-    # For variables, we might not have the column in the dataframe
-    if column not in df.columns:
-        # If it's a single-column dataframe, use the first column
-        if len(df.columns) == 1:
-            column = df.columns[0]
-        else:
-            return {"status": "error", "message": f"Column '{column}' not found."}
+        if column:
+            if column not in df.columns:
+                # If it's a single-column dataframe, use the first column
+                if len(df.columns) == 1:
+                    column = df.columns[0]
+                else:
+                    return {"status": "error", "message": f"Column '{column}' not found."}
+            df = pd.DataFrame({column: df[column]})
 
     try:
-        export_df = pd.DataFrame({column: df[column]})
-        export_df.to_csv(destination, index=False)
-        return {"status": "success", "message": f"Exported column '{column}' to {destination}"}
+        df.to_csv(destination, index=False)
+        return {"status": "success", "message": f"Exported to {destination}"}
     except Exception as e:
         return {"status": "error", "message": f"Export failed: {str(e)}"}
+
 
 
 def set_statement(var_name: str, value):
@@ -459,7 +476,8 @@ def forecast_statement(identifier: str, column: str, model: str, params: dict, a
             result = {
                 "status": "success",
                 "message": f"Forecasted {column} using ARIMA with order {order}",
-                "forecast": forecast
+                "forecast": forecast,
+                "full_series": df[column].tolist() + forecast  # Append forecast to original
             }
 
         elif model == "Prophet":
@@ -490,7 +508,8 @@ def forecast_statement(identifier: str, column: str, model: str, params: dict, a
             result = {
                 "status": "success",
                 "message": f"Forecasted {column} using Prophet for {params.get('steps', 1)} periods.",
-                "forecast": forecast
+                "forecast": forecast,
+                "full_series": df[column].tolist() + forecast  # Append forecast to original
             }
 
         elif model == "LSTM":
@@ -557,7 +576,8 @@ def forecast_statement(identifier: str, column: str, model: str, params: dict, a
             result = {
                 "status": "success",
                 "message": f"Forecasted {column} using LSTM with {layers} layers for {steps} steps.",
-                "forecast": forecast
+                "forecast": forecast,
+                "full_series": df[column].tolist() + forecast  # Append forecast to original
             }
         else:
             return {"status": "error", "message": f"Unsupported model type: {model}"}
@@ -1034,11 +1054,52 @@ def interpret(ast: dict):
 
                 # Plot function calls
                 if statement['function'] == 'LINEPLOT':
-                    result = plot_line(args.get('data', []),
-                                       args.get('x_label', ''),
-                                       args.get('y_label', ''),
-                                       args.get('title'),
-                                       args.get('legend'))
+                    # --- Resolve data argument ---
+                    raw_data = args.get('data', [])
+                    # If it's a string like "[high_after_4]", try to parse as list
+                    if isinstance(raw_data, str):
+                        try:
+                            import ast
+                            parsed_data = ast.literal_eval(raw_data)
+                        except Exception:
+                            parsed_data = [raw_data]
+                    else:
+                        parsed_data = raw_data
+
+                    # Now, resolve variable names inside the parsed_data list
+                    resolved_data = []
+                    for item in parsed_data:
+                        # Handle $var references
+                        var_name = None
+                        if isinstance(item, str):
+                            if item.startswith('$'):
+                                var_name = item[1:]
+                            elif item in variables:  # Unprefixed variable name
+                                var_name = item
+
+                        if var_name and var_name in variables and 'data' in variables[var_name]:
+                            # Expand the variable's data values
+                            resolved_data.extend(list(variables[var_name]['data'].values()))
+                        elif var_name and var_name in variables and 'forecast' in variables[var_name]:
+                            resolved_data.extend(variables[var_name]['forecast'])
+                        elif isinstance(item, (int, float)):
+                            resolved_data.append(item)
+                        elif isinstance(item, list):
+                            resolved_data.extend(item)
+                        # Add other handlers as you need
+                        # else:  # Fallback, ignore or append empty
+                    # Fall back to original data if nothing resolved
+                    if not resolved_data and isinstance(parsed_data, list):
+                        resolved_data = parsed_data
+
+                    result = plot_line(
+                        resolved_data,
+                        args.get('x_label', ''),
+                        args.get('y_label', ''),
+                        args.get('title'),
+                        args.get('legend')
+                    )
+
                 elif statement['function'] == 'histogram':
                     result = plot_histogram(args.get('data', []),
                                             args.get('x_label', ''),
@@ -1061,16 +1122,25 @@ def interpret(ast: dict):
                 else:
                     result = {"status": "error", "message": f"Unknown plot type: {statement['function']}"}
 
+
             elif stmt_type == 'Export':
-                # Handle both 'table' and variable references
+
+                # Prefer 'table', but if only 'variable' is present, use it
+
                 identifier = statement.get('table')
-                if identifier and identifier.startswith('$'):
-                    # It's already a variable reference
-                    pass
-                elif 'variable' in statement:
+
+                if not identifier and 'variable' in statement:
+
                     identifier = '$' + statement['variable']
 
-                result = export_statement(identifier, statement['column'], statement['to'])
+                elif identifier and not identifier.startswith('$') and 'variable' in statement:
+
+                    # If both present, and variable is intended, prefer it
+
+                    identifier = '$' + statement['variable']
+
+                result = export_statement(identifier, statement.get('column'), statement['to'])
+
 
             elif stmt_type == 'Loop':
                 dictionary = {}
@@ -1180,27 +1250,40 @@ if __name__ == '__main__':
 
     # Test with ChronoLang code
     test_code = {
-        "code": """LOAD sales_data FROM "Amazon.csv"
+        "code": """
+        LOAD demo_data FROM "C:/Users/user/Downloads/amazon_sample_20rows_missing.csv"
 
-        TREND(sales_data.Open) -> forecast_next(7d)
+REPLACE missing IN demo_data.Open WITH 1500
+REPLACE missing IN demo_data.High WITH 1520
+REPLACE missing IN demo_data.Low WITH 1500
+REPLACE missing IN demo_data.Close WITH 1510
+REPLACE missing IN demo_data.Volume WITH 1200000
+
+SELECT demo_data.High WHERE Date > "2019-01-04" AS high_after_4
+
+FORECAST $high_after_4 USING Prophet(model_order=3, seasonal_order=2) AS forecast_high
 
 
-        SELECT sales_data.Low WHERE DATE < "2019-01-01" AS var_1
-        REMOVE missing FROM sales_data.Low
-        EXPORT sales_data.Low TO "../results/run3.csv"
+PLOT LINEPLOT(
+    data=[$high_after_4],
+    x_label="Index",
+    y_label="High",
+    title="High Price After 2019-01-04"
+)
 
-        FORECAST $var_1 USING Prophet(model_order=3, seasonal_order=2)
-        PLOT histogram(
-            data=[$var_1],
-            x_label="Days",
-            y_label="Sales",
-            bins=10,
-            title="Weekly Sales"
-        )
+EXPORT demo_data.High TO "cleaned_high.csv"
+EXPORT demo_data.Open TO "cleaned_open.csv"
+EXPORT demo_data.Volume TO "cleaned_volume.csv"
+EXPORT $forecast_high TO "forecast_high.csv"
+
+)
+
 """
     }
 
     result = execute_chronolang_json(test_code)
+
     #datasets_info = get_datasets_info()
     print(result)
+    print(variables)
     #print(datasets_info)
